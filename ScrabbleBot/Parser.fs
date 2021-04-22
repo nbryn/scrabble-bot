@@ -148,7 +148,7 @@
           {
          center = bp.center
          defaultSquare = parseSquareFun (Map.find bp.usedSquare bp.squares)
-         squares = Map.map (fun _ y -> parseSquareFun y) bp.squares |> fun x -> parseBoardFun bp.prog x
+         squares = Map.map (fun _ y -> parseSquareFun y) bp.squares |> parseBoardFun bp.prog
         }
 
 

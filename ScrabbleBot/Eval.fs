@@ -8,8 +8,8 @@
     let state = mkState [("x", 5); ("y", 42)] hello ["_pos_"; "_result_"]
     let emptyState = mkState [] [] []
     
-    let add a b = failwith "Not implemented"      
-    let div a b = failwith "Not implemented"      
+    let add a b = a >>= (fun s -> b >>= (fun t -> ret (s + t)))
+    let div a b = a >>= (fun s ->  b >>= (fun t -> if t = 0 then fail DivisionByZero else ret (s / t)))      
 
     type aExp =
         | N of int
@@ -132,19 +132,15 @@
 (* Part 4 *) 
 
     type word = (char * int) list
-    type squareFun = word -> int -> int -> int // This has changed from Assignment 6
+    type squareFun = word -> int -> int -> int
 
-    // Refactor your implementation from Assignment 6 to remove the Result type and return 0 on failure.
-    // Details are in the assignment.
+
     let stmntToSquareFun (stm : stm) =
          fun w pos acc -> 
             mkState [("_pos_", pos); ("_acc_", acc); ("_result_", 0)] w ["_pos_"; "_acc_"; "_result_"]
             |> fun s -> stmntEval stm >>>= lookup "_result_" |> fun x -> match evalSM s x with
                                                                          | Success (r) -> r
                                                                          | Failure (_) -> 0
-    // Refactor your implementation from Assignment 6 to remove the Result type and return None on failure.
-    // Also, make sure the funciton is polymorphic on the return type and the lookup map.
-    // Details in the assignment.
     let stmntToBoardFun (stm : stm) (m : Map<int, 'a>) =
         fun (x,y) ->
         mkState [("_x_", x); ("_y_", y); ("_result_", 0)] [] ["_x_"; "_y_"; "_result_"]
