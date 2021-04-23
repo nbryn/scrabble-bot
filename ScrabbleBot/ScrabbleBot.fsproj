@@ -6,7 +6,7 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Company>IT University of Copenhagen</Company>
     
-    <Version>1.0.7</Version>
+    <Version>1.0.8</Version>
     <PackageId>nbryn</PackageId>
     <AssemblyName>nbryn</AssemblyName>
     <Authors>Niklas Brynfeldt - Gustav Espersen</Authors>
@@ -30,8 +30,11 @@ Group name: &lt;Your group name goes here&gt; (optional since this is hosted in 
     <Compile Include="Eval.fs" />
     <Compile Include="Parser.fsi" />
     <Compile Include="Parser.fs" />
+    <Compile Include="MoveGenerator.fsi" />
+    <Compile Include="MoveGenerator.fs" />
     <Compile Include="Scrabble.fsi" />
     <Compile Include="Scrabble.fs" />
+  
   </ItemGroup>
 
   <ItemGroup>
