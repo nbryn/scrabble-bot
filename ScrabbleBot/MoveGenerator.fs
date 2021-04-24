@@ -192,23 +192,17 @@ module internal MoveGenerator =
             hand |> List.fold (fun x k ->     let ht = Map.find k st.tiles
                                               match Dictionary.step (fst ht) dict with
                                               | Some (true, d) ->  let m = (c, (k, ht))
-                                                                   let nel = l@[m]
-                                                                   //let s = List.map (fun _ -> l@[m]) x
-                                                                   let p = calcPoint nel
-                                                                   let mp = Map.add p nel words                                                             
-                                                                   let h = removeFirst (fun m -> m = k ) hand
                                                                    let nm = if l.Length > 0 then if fst ht = getChar (l.[l.Length-1]) then l else l@[m]
                                                                             else [m]   
-                                                                   Map.fold (fun acc key value -> Map.add key value acc) (go h nm (incrementX c) mp d) x
+                                                                   Map.fold (fun acc key value -> Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) nm (incrementX c) (Map.add (calcPoint (l@[m])) (l@[m]) words) d) x
                                        
                                               | Some (false, d) -> let hm = (c, (k, ht))
-                                                                   let h = removeFirst (fun m -> m = k ) hand
                                                                    let nm = if l.Length > 0 then if fst ht = getChar (l.[l.Length-1]) then l else l@[hm]
                                                                             else [hm]
-                                                                   Map.fold (fun acc key value -> Map.add key value acc) (go h nm (incrementX c) words d) x
+                                                                   Map.fold (fun acc key value -> Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) nm (incrementX c) words d) x
                                                                    
                                        
-                                              | None            -> Map.toList x |> fun x -> x @ (Map.toList words) |> Map.ofList
+                                              | None            -> Map.ofList (Map.toList x @ (Map.toList words)) 
 
                              ) words
 
