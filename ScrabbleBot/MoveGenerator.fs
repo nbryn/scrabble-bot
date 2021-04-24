@@ -3,6 +3,12 @@ namespace nbryn
 open Parser
 open ScrabbleUtil
 
+module InternalState =
+    type InternalState = {
+        validWords : List<List<coord*(uint32*(char*int))>>
+    }
+
+    let updateState vw = {validWords = vw}
 module internal MoveGenerator =
   
     type State = {
@@ -14,6 +20,8 @@ module internal MoveGenerator =
         lastPlayed    : List<coord*(uint32*(char*int))>
         tiles         : Map<uint32, char*int>
     }
+
+
 
     type Surrounding = bool*bool
 
@@ -144,29 +152,81 @@ module internal MoveGenerator =
 
         findBestWord (wordsHorizontal @ wordsVertical)
 
+// for each word words -> append new 'letter'
+// List.map (fun x -> List.map (fun t ->) hand) words
+// hand |> List.map (fun t -> (t, Map.find t st.tiles) |> fun (m, s) -> x@[(incrementX c, (m, s))])
+// For each t append each x
+//|> fun x -> List.fold (fun h m -> List.fold (fun l p -> l@p) h m) w x 
 
+// List.map (fun x -> if wordexists st x w then ) w
+(* 
+    let createWordss (st : State) (words : List<List<coord*(uint32*(char*int))>>) (c : coord) =
+        let rec go hand w c =
+            if List.isEmpty hand then vw
+            else 
+            hand |> List.map (fun t -> (t, Map.find t st.tiles) |> fun (m, s) -> incrementX c, (m, s)) 
+                 |> fun x -> List.map (fun h -> h@x) w                                                                                
+                 |> fun m -> go (removeFirst (fun h -> h <> uint32 (fst (snd (m.[0].[m.[0].Length-1])))) hand) m (incrementX c)
+            
+        go (MultiSet.toList st.hand) words c [[]] *)
 
-    let createWord (st : State) (word : List<coord*(uint32*(char*int))>) (c : coord) =
-        let rec go hand word c =
-            if wordExists st word
-            then hand |> List.map (fun x -> (x, Map.find x st.tiles) |> fun (z, t) -> word@[(incrementX c, (z, t))]) 
-                      |> List.filter (fun x -> x.Length > 0)
-                      |> fun x -> let bestWord = findBestWord x
-                                  go (removeFirst (fun x -> x <> uint32 (snd (snd (snd (bestWord.[0]))))) hand) bestWord (incrementX c)
-            else word
+    (* let createWordss (st : State) (words : List<List<coord*(uint32*(char*int))>>) (c : coord) =
+        let rec go hand words c =
+            hand |> List.map (fun x -> (x, Map.find x st.tiles) |> fun (z, t) -> word@[(incrementX c, (z, t))])                                                                                
+                 |> fun x -> go (removeFirst (fun h -> h <> uint32 (fst (snd (x.[0].[0])))) hand) x (incrementX c)
+            
 
-        go (MultiSet.toList st.hand) word c
+        go (MultiSet.toList st.hand) words c *)
 
+    let getChar (s : (coord*(uint32*(char*int)))) = fst (snd((snd s)))
+
+    let findValidWords (st : State) (coord : coord) =
+        let rec go (hand : List<uint32>) (l : List<coord*(uint32*(char*int))>) (c : coord) (words : List<List<coord*(uint32*(char*int))>>) (dict : Dictionary.Dict) =
+            hand |> List.fold (fun x k -> let ht = Map.find k st.tiles
+                                          match Dictionary.step (fst ht) dict with
+                                          | Some (true, d)  -> let m = (c, (k, ht))
+                                                               let newC = (incrementX c)
+                                                               let s = List.map (fun _ -> l@[m]) x                                                               
+                                                               let h = removeFirst (fun m -> m = k ) hand
+                                                               let nm = if l.Length > 0 then if fst ht = getChar (l.[l.Length-1]) then l else l@[m]
+                                                                        else [m]
+                                                               go h nm (newC) s d
+                                       
+                                          | Some (false, d) -> let newC = (incrementX c)
+                                                               let hm = (c, (k, ht))
+                                                               let h = removeFirst (fun m -> m = k ) hand
+                                                               let nm = if l.Length > 0 then if fst ht = getChar (l.[l.Length-1]) then l else l@[hm]
+                                                                        else [hm]
+                                                               go h nm (newC) words d
+                                       
+                                          | None            -> x@words 
+
+                                ) words
+
+        go (MultiSet.toList st.hand) [] coord [[]] st.dict
+
+    (* let findValidWords (st : State) (coord : coord) (first : uint32) =
+        let rec go (uint32 : next) (hand : List<uint32>) (c : coord) (words : List<List<coord*(uint32*(char*int))>>) =
+            let ht = Map.find x st.tiles
+            match ScrabbleUtil.Dictionary.step (fst ht) st.dict with
+            | Some (b, d) -> if b then let m = (c, (x, ht))
+                                       let s = List.map (fun t -> [m]@t) words
+                                       let k = removeFirst (fun m -> m = x) hand
+                                  else go (hand.[0]) k (incrementX c) s
+            | None        -> words 
+                             
+
+        go (removeFirst (fun x -> x = first) MultiSet.toList st.hand) coord [[]] *)
 
     let getStarterWords (st : State) =
        MultiSet.toList st.hand |> List.map (fun x -> (x, Map.find x st.tiles) |> fun (z, t) -> [(st.board.center, (z, t))]) 
-       |> List.map (fun x -> createWord st x (st.board.center)) 
+       |> fun x -> findValidWords st st.board.center 
 
 
 
     // Find bounds of board?
     let findMove (st : State) =
-        if fst st.lastPlayed.[0] = st.board.center then getStarterWords st |> findBestWord
+        if fst st.lastPlayed.[0] = st.board.center then findValidWords st st.board.center |> findBestWord
         else st.lastPlayed |> List.map (fun t -> (createWords st t)) |> findBestWord
         
 
