@@ -148,7 +148,7 @@ module internal MoveGenerator =
     let calcPoint (l : List<coord*(uint32*(char*int))>) = List.fold (fun acc (x, (y, (z,x))) -> acc + x) 0 l
 
     let findValidWords (st : State) (coord : coord) =
-        let rec go (hand : List<uint32>) (l : List<coord*(uint32*(char*int))>) (c : coord) (words : Map<int, List<coord*(uint32*(char*int))>>) (dict : Dictionary.Dict) =
+        let rec go hand (l : List<coord*(uint32*(char*int))>) c words dict =
             hand |> List.fold (fun x k -> let ht = Map.find k st.tiles
                                           match Dictionary.step (fst ht) dict with
                                           | Some (true, d) ->  let m = (c, (k, ht))
