@@ -180,26 +180,59 @@ module internal MoveGenerator =
 
     let getChar (s : (coord*(uint32*(char*int)))) = fst (snd((snd s)))
 
+ (*    let sameWord = (l1 : List<List<coord*(uint32*(char*int))>>) (l2 :List<List<coord*(uint32*(char*int))>>) =
+        if l1.Length <> l2.length then false
+        else [0..] *)
+
+    let calcPoint (l : List<coord*(uint32*(char*int))>) = List.fold (fun acc (x, (y, (z,x))) -> acc + x) 0 l
+
+
+    let findValidWords2 (st : State) (coord : coord) =
+        let rec go (hand : List<uint32>) (l : List<coord*(uint32*(char*int))>) (c : coord) (words : Map<int, List<coord*(uint32*(char*int))>>) (dict : Dictionary.Dict) =
+            hand |> List.fold (fun x k ->     let ht = Map.find k st.tiles
+                                              match Dictionary.step (fst ht) dict with
+                                              | Some (true, d) ->  let m = (c, (k, ht))
+                                                                   let nel = l@[m]
+                                                                   //let s = List.map (fun _ -> l@[m]) x
+                                                                   let p = calcPoint nel
+                                                                   let mp = Map.add p nel words                                                             
+                                                                   let h = removeFirst (fun m -> m = k ) hand
+                                                                   let nm = if l.Length > 0 then if fst ht = getChar (l.[l.Length-1]) then l else l@[m]
+                                                                            else [m]   
+                                                                   Map.fold (fun acc key value -> Map.add key value acc) (go h nm (incrementX c) mp d) x
+                                       
+                                              | Some (false, d) -> let hm = (c, (k, ht))
+                                                                   let h = removeFirst (fun m -> m = k ) hand
+                                                                   let nm = if l.Length > 0 then if fst ht = getChar (l.[l.Length-1]) then l else l@[hm]
+                                                                            else [hm]
+                                                                   Map.fold (fun acc key value -> Map.add key value acc) (go h nm (incrementX c) words d) x
+                                                                   
+                                       
+                                              | None            -> Map.toList x |> fun x -> x @ (Map.toList words) |> Map.ofList
+
+                             ) words
+
+        go (MultiSet.toList st.hand) [] coord Map.empty st.dict
+
+    //Remove double
     let findValidWords (st : State) (coord : coord) =
         let rec go (hand : List<uint32>) (l : List<coord*(uint32*(char*int))>) (c : coord) (words : List<List<coord*(uint32*(char*int))>>) (dict : Dictionary.Dict) =
             hand |> List.fold (fun x k -> let ht = Map.find k st.tiles
                                           match Dictionary.step (fst ht) dict with
                                           | Some (true, d)  -> let m = (c, (k, ht))
-                                                               let newC = (incrementX c)
                                                                let s = List.map (fun _ -> l@[m]) x                                                               
                                                                let h = removeFirst (fun m -> m = k ) hand
                                                                let nm = if l.Length > 0 then if fst ht = getChar (l.[l.Length-1]) then l else l@[m]
                                                                         else [m]
-                                                               go h nm (newC) s d
+                                                               go h nm (incrementX c) s d
                                        
-                                          | Some (false, d) -> let newC = (incrementX c)
-                                                               let hm = (c, (k, ht))
+                                          | Some (false, d) -> let hm = (c, (k, ht))
                                                                let h = removeFirst (fun m -> m = k ) hand
                                                                let nm = if l.Length > 0 then if fst ht = getChar (l.[l.Length-1]) then l else l@[hm]
                                                                         else [hm]
-                                                               go h nm (newC) words d
+                                                               go h nm (incrementX c) words d
                                        
-                                          | None            -> x@words 
+                                          | None            -> words@x
 
                                 ) words
 
@@ -222,16 +255,19 @@ module internal MoveGenerator =
        MultiSet.toList st.hand |> List.map (fun x -> (x, Map.find x st.tiles) |> fun (z, t) -> [(st.board.center, (z, t))]) 
        |> fun x -> findValidWords st st.board.center 
 
+    let findMove (st : State) =
+        if fst st.lastPlayed.[0] = st.board.center 
+        then findValidWords2 st st.board.center |> Map.toList 
+             |> fun x -> snd (Seq.maxBy fst x)
+        else st.lastPlayed |> List.map (fun t -> (createWords st t)) |> findBestWord
 
 
     // Find bounds of board?
-    let findMove (st : State) =
+    (* let findMove (st : State) =
         if fst st.lastPlayed.[0] = st.board.center then findValidWords st st.board.center |> findBestWord
-        else st.lastPlayed |> List.map (fun t -> (createWords st t)) |> findBestWord
+        else st.lastPlayed |> List.map (fun t -> (createWords st t)) |> findBestWord *)
         
 
     // Add prefix and postfix
     // Search 
     let convertState b d pn h p lp t = {board = b; dict = d; playerNumber = pn; hand = h; played = p; lastPlayed = lp; tiles = t}
-
-    let calcPoint (word : List<tile>) = failwith 
