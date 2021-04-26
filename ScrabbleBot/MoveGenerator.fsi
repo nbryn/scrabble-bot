@@ -10,9 +10,9 @@ module internal MoveGenerator =
         playerNumber  : uint32
         hand          : MultiSet.MultiSet<uint32>
         played        : Map<coord, (uint32*(char*int))>
-        lastPlayed    : List<coord*(uint32*(char*int))>
         tiles         : Map<uint32, char*int>
+        turns         : int
     }
 
     val findMove : State -> List<(coord * (uint32 * (char * int)))>
-    val convertState : Parser.board -> ScrabbleUtil.Dictionary.Dict -> uint32 -> MultiSet<uint32> -> Map<coord, (uint32*(char*int))> -> List<coord*(uint32*(char*int))> -> Map<uint32, char*int> -> State
+    val convertState : Parser.board -> Dictionary.Dict -> uint32 -> MultiSet<uint32> -> Map<coord, (uint32*(char*int))> -> Map<uint32, char*int> -> int -> State

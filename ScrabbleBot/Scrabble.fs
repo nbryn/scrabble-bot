@@ -49,11 +49,11 @@ module State =
         playerNumber  : uint32
         hand          : MultiSet.MultiSet<uint32>
         played        : Map<coord, (uint32*(char*int))>
-        lastPlayed    : List<coord*(uint32*(char*int))>
         tiles         : Map<uint32, char*int>
+        turns         : int
     }
 
-    let mkState b d pn h p lp t = {board = b; dict = d;  playerNumber = pn; hand = h; played = p; lastPlayed = lp; tiles = t}
+    let mkState b d pn h p t tu = {board = b; dict = d;  playerNumber = pn; hand = h; played = p; tiles = t; turns = tu}
 
     let board st         = st.board
     let dict st          = st.dict
@@ -71,7 +71,7 @@ module Scrabble =
             // remove the force print when you move on from manual input (or when you have learnt the format)
             forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
             //let input =  System.Console.ReadLine()
-            let move = findMove (convertState st.board st.dict st.playerNumber st.hand st.played st.lastPlayed st.tiles)
+            let move = findMove (convertState st.board st.dict st.playerNumber st.hand st.played st.tiles st.turns)
 
             debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
             send cstream (SMPlay move)
@@ -90,7 +90,7 @@ module Scrabble =
                 let tempHand = List.fold (fun acc (x, _) -> MultiSet.removeSingle x acc) st.hand oldTiles
                 let newHand = List.fold (fun acc (x, k) -> MultiSet.add x k acc) tempHand newPieces
                 
-                let newState = State.mkState st.board st.dict st.playerNumber newHand played lastPlayed st.tiles
+                let newState = State.mkState st.board st.dict st.playerNumber newHand played st.tiles (st.turns + 1)
                 aux newState
             | RCM (CMPlayed (pid, ms, points)) ->
                 (* Successful play by other player. Update your state *)
@@ -137,4 +137,4 @@ module Scrabble =
 
         let h = convertTile (Map.find (uint32 1) tiles)
 
-        fun () -> playGame cstream t (State.mkState board dict playerNumber handSet Map.empty [(board.center, (uint32 3, convertTile(Map.find (uint32 3) tiles)))] t) 
+        fun () -> playGame cstream t (State.mkState board dict playerNumber handSet (Map.ofList [(board.center, (uint32 3, convertTile(Map.find (uint32 3) tiles)))]) t 0) 
