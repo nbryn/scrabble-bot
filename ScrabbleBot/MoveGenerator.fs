@@ -27,10 +27,7 @@ module internal MoveGenerator =
     let incrementYTimes (c : coord) (amount : int) : coord = (fst c + amount, snd c)
     let decrementYTimes (c : coord) (amount : int) : coord = (fst c - amount, snd c)
         
-    let incrementCoord (c : coord) (incX : bool) : coord  = if incX then incrementX c else incrementY c
-    let decrementCoord (c : coord) (decX : bool) : coord  = if decX then decrementX c else decrementY c
-
-    // Need to parse output
+    // Need to look at function from map
     let squareExist (st : State) (coord : coord) =
         ((fst coord) < 8 && (fst coord) > -8) && ((snd coord) < 8 && (snd coord) > -8)
 
@@ -86,7 +83,6 @@ module internal MoveGenerator =
 
         go st c word
 
-     //| ((_,true), (true,false))  
     // Calc points
     let checkVertical (st : State) (c : coord) (word : List<coord*(uint32*(char*int))>) =
        match verticalChecker st c with
@@ -116,181 +112,86 @@ module internal MoveGenerator =
 
     let calcPoint (l : List<coord*(uint32*(char*int))>) = List.fold (fun acc (x, (y, (z,x))) -> acc + x) 0 l
 
-    let getId (n : coord*(uint32*(char*int))) = fst (snd n)
-
     let rec stepDictWordExists (word : List<coord*(uint32*(char*int))>) (dict : Dictionary.Dict) =
             if List.isEmpty word then dict
             else stepDictWordExists (word.[1..word.Length-1]) (snd ((Dictionary.step (getChar word.[0]) dict).Value))
 
 
-    // Pass increment/decrement in
-    let collectWordVerticalDecrement (st : State) (first : coord*(uint32*(char*int))) =
-        let rec go (word : List<coord*(uint32*(char*int))>) (c : coord) =
+    let collectWord (st : State) (first : coord*(uint32*(char*int))) coordAdjuster append =
+        let rec go word c =
             if   squareExistsAndNotFree st c
-            then go ([c, (Map.find c st.played)]@word) (decrementY c)                
+            then let newWord = if append then [c, (Map.find c st.played)]@word else word@[c, (Map.find c st.played)]
+                 go newWord (coordAdjuster c)                
             else word
 
-        go [first] (decrementY (fst first))
-
-    let collectWordVerticalIncrement (st : State) (first : coord*(uint32*(char*int))) =
-        let rec go (word : List<coord*(uint32*(char*int))>) (c : coord) =
-            if   squareExistsAndNotFree st c
-            then go (word@[c, (Map.find c st.played)]) (incrementY c)                
-            else word
-
-        go [first] (incrementY (fst first))
-
-    let collectWordHorizontalDecrement (st : State) (first : coord*(uint32*(char*int))) =
-        let rec go (word : List<coord*(uint32*(char*int))>) (c : coord) =
-            if   squareExistsAndNotFree st c
-            then go ([c, (Map.find c st.played)]@word) (decrementX c)                
-            else word
-
-        go [first] (decrementX (fst first))
-
-
-    let collectWordHorizontalIncrement (st : State) (first : coord*(uint32*(char*int))) =
-        let rec go (word : List<coord*(uint32*(char*int))>) (c : coord) =
-            if   squareExistsAndNotFree st c
-            then go (word@[c, (Map.find c st.played)]) (incrementX c)                
-            else word
-
-        go [first] (incrementX (fst first))
-
+        go [first] (coordAdjuster (fst first))
 
 
     // Mathc checdkHorizontal with -> include points
     // Dont check vertical on first
-    let findValidWordsFromExistingVerticalDec (st : State) (coord : coord) (startingPoint : List<coord*(uint32*(char*int))>) =
-        let rec go hand (word : List<coord*(uint32*(char*int))>) existing c words =
-            if not (squareExist st (decrementY c))
-            then words
+    let findValidWords (st : State) coord startingPoint coordAdjuster checker append =
+        let rec go hand word existing c words =
+            if not (squareExist st (coordAdjuster c)) then words
             else
             hand |> List.fold (fun x k -> let charr = Map.find k st.tiles
-                                          if not (checkHorizontal st c [(c, (k, charr))])
-                                          then words
-                                          else  
-                                          let newEntry = (c, (k, charr)) 
-                                          let newWord = [newEntry]@word
-                                          let newExisting = [newEntry]@existing
-                                          if wordExists st newExisting
-                                          then Map.fold (fun acc key value -> Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) newWord newExisting (decrementY c) (Map.add (calcPoint (newWord)) (newWord) words)) x 
-                                          else Map.fold (fun acc key value -> Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) newWord newExisting (decrementY c) words) x
-                                          
-                             ) words
-
-        go (MultiSet.toList st.hand) [] startingPoint coord Map.empty
-
-
-    
-    let findValidWordsFromExistingVerticalInc (st : State) (coord : coord) (startingPoint : List<coord*(uint32*(char*int))>)  =
-        let rec go hand (word : List<coord*(uint32*(char*int))>) existing c words =
-            if not (squareExist st (incrementY c))
-            then words
-            else
-            hand |> List.fold (fun x k -> let charr = Map.find k st.tiles
-                                          if not (checkHorizontal st c [(c, (k, charr))])
-                                          then words
-                                          else                                         
-                                          let newEntry = (c, (k, charr)) 
-                                          let newWord = word@[newEntry]
-                                          let newExisting = existing@[newEntry]
-                                          if wordExists st newExisting
-                                          then Map.fold (fun acc key value -> Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) newWord newExisting (incrementY c) (Map.add (calcPoint (newWord)) (newWord) words)) x 
-                                          else Map.fold (fun acc key value -> Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) newWord newExisting (incrementY c) words) x
-
-                             ) words
-
-        go (MultiSet.toList st.hand) [] startingPoint coord Map.empty
-
-    // Pass decrement/increment & checkX in
-    let findValidWordsFromExistingHorizontalDec (st : State) (coord : coord) (startingPoint : List<coord*(uint32*(char*int))>) =
-        let rec go hand (word : List<coord*(uint32*(char*int))>) existing c words =
-            if not (squareExist st (decrementX c)) then words
-            else
-            hand |> List.fold (fun x k -> let charr = Map.find k st.tiles
-                                          if not (checkVertical st c [(c, (k, charr))]) then words
-                                          else                                           
-                                          if wordExists st ([(c, (k, charr)) ]@existing)
+                                          if not (checker st c [(c, (k, charr))]) then words
+                                          else 
+                                          let newWord     = if append then [(c, (k, charr))]@word else word@[(c, (k, charr))]
+                                          let newExisting = if append then [(c, (k, charr))]@existing else existing@[(c, (k, charr))]                                
+                                          if  wordExists st newExisting
                                           then Map.fold (fun acc key value -> 
-                                               Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) ([(c, (k, charr))]@word) ([(c, (k, charr))]@existing) (decrementX c) (Map.add (calcPoint ([(c, (k, charr))]@word)) ([(c, (k, charr))]@word) words)) x 
+                                               Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) newWord newExisting (coordAdjuster c) (Map.add (calcPoint newWord) newWord words)) x 
                                           else Map.fold (fun acc key value -> 
-                                               Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) ([(c, (k, charr))]@word) ([(c, (k, charr))]@existing) (decrementX c) words) x
+                                               Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) newWord newExisting (coordAdjuster c) words) x
                                           
                              ) words
 
         go (MultiSet.toList st.hand) [] startingPoint coord Map.empty
 
 
-    // Fix vertical inc
-
-    let findValidWordsFromExistingHorizontalInc (st : State) (coord : coord) (startingPoint : List<coord*(uint32*(char*int))>) =
-        let rec go hand (word : List<coord*(uint32*(char*int))>) existing c words =
-            if not (squareExist st (incrementX c))
-            then words
-            else
-            hand |> List.fold (fun x k -> let charr = Map.find k st.tiles
-                                          if not (checkVertical st c [(c, (k, charr))])
-                                          then words
-                                          else  
-                                          let newEntry = (c, (k, charr)) 
-                                          let newWord = word@[newEntry]
-                                          let newExisting = existing@[newEntry]
-                                          if wordExists st newExisting
-                                          then Map.fold (fun acc key value -> Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) newWord newExisting (incrementX c) (Map.add (calcPoint (newWord)) (newWord) words)) x 
-                                          else Map.fold (fun acc key value -> Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) newWord newExisting (incrementX c) words) x
-                                          
-                             ) words
-
-        go (MultiSet.toList st.hand) [] startingPoint coord Map.empty
-
-
-    let isFirstMove (st : State) = st.turns = 0
-
+    // Include point from all words -> include points from squares
     // Try place word before, after & in middle
+    // Check in front of curren tile - Eg checkHorizontal on Horizontal placement not only vertical
+    // Change tiles if no options
     let tryHorizontal (st : State) (first : coord*(uint32*(char*int))) =
        match horizontalChecker st (fst first) with
        | ((false,_), (false,_)) -> None
        | ((_,false), (_,false)) -> None
+       // Problems with placing tiles on occupied square
        | ((_,true), (_,true))   -> if st.turns = 0 
-                                   then Some (findValidWordsFromExistingHorizontalInc st (fst first) [])
+                                   then Some (findValidWords st (fst first) [] incrementX checkVertical false)
                                    else
-                                   findValidWordsFromExistingHorizontalInc st (incrementX (fst first)) [first]
-                                   |> fun x -> Some (Map.fold (fun acc key value -> Map.add key value acc) x (findValidWordsFromExistingHorizontalDec st (decrementX (fst first)) [first]))
+                                   findValidWords st (incrementX (fst first)) [first] incrementX checkVertical false
+                                   |> fun x -> Some (Map.fold (fun acc key value -> Map.add key value acc) x (findValidWords st (decrementX (fst first)) [first] decrementX checkVertical true))
                             
-       | ((_,true), (_,_))      -> let existingWord = collectWordHorizontalIncrement st first 
-                                   Some (findValidWordsFromExistingHorizontalDec st (decrementX (fst first)) existingWord)
+       | ((_,true), (_,_))      -> let existingWord = collectWord st first incrementX false
+                                   Some (findValidWords st (decrementX (fst first)) existingWord decrementX checkVertical true)
       
-       | ((_,_), (_,true))      -> let existingWord = collectWordHorizontalDecrement st first            
-                                   Some (findValidWordsFromExistingHorizontalDec st (decrementXTimes (fst first) existingWord.Length) existingWord)
+       | ((_,_), (_,true))      -> let existingWord = collectWord st first decrementX false          
+                                   Some (findValidWords st (decrementXTimes (fst first) existingWord.Length) existingWord decrementX checkVertical true)
 
                             
-
-
-
-
     let tryVertical (st : State) (first : coord*(uint32*(char*int))) =
        match verticalChecker st (fst first) with
        | ((false,_), (false,_)) -> None
        | ((_,false), (_,false)) -> None                           
        | ((_,true), (_,true))   -> if st.turns = 0 
-                                   then Some (findValidWordsFromExistingVerticalInc st (fst first) [])
+                                   then Some (findValidWords st (fst first) [] incrementY checkHorizontal false)
                                    else
-                                   findValidWordsFromExistingVerticalInc st (incrementY (fst first)) [first]
-                                   |> fun x -> Some (Map.fold (fun acc key value -> Map.add key value acc) x (findValidWordsFromExistingVerticalDec st (decrementY (fst first)) [first]))
+                                   findValidWords st (incrementY (fst first)) [first] incrementY checkHorizontal false
+                                   |> fun x -> Some (Map.fold (fun acc key value -> Map.add key value acc) x (findValidWords st (decrementY (fst first)) [first] decrementY checkHorizontal true))
                
-       | ((_,true), (_,_))    -> let existingWord = collectWordVerticalDecrement st first            
-                                 Some (findValidWordsFromExistingVerticalDec st (decrementYTimes (fst first) existingWord.Length) existingWord)
+       | ((_,true), (_,_))    -> let existingWord = collectWord st first incrementY false          
+                                 Some (findValidWords st (decrementYTimes (fst first) existingWord.Length) existingWord decrementY checkHorizontal true)
 
-       | ((_,_), (_,true))    -> let existingWord = collectWordVerticalDecrement st first 
-                                 Some (findValidWordsFromExistingVerticalInc st (incrementY (fst first)) existingWord)
+       | ((_,_), (_,true))    -> let existingWord = collectWord st first decrementY true
+                                 Some (findValidWords st (incrementY (fst first)) existingWord incrementY checkHorizontal false)
 
     let collectWords (st : State) =
         st.played |> Map.toList |> List.map (fun coord -> tryHorizontal st coord) 
                   |> fun x -> (List.map (fun coord -> tryVertical st coord) (Map.toList st.played)) @ x
 
-    let wordOnBoard (st : State) (w : list<coord * (uint32 * (char * int))>) =
-       w |> List.forall (fun x -> squareExist st (fst x))
+    let wordOnBoard (st : State) word = word |> List.forall (fun x -> squareExist st (fst x))
 
     let extractResult (st : State) (l : list<option<Map<int,list<coord * (uint32 * (char * int))>>>>) =
         l |> List.filter (fun x -> x.IsSome) |> List.map (fun x -> x.Value)
@@ -298,9 +199,9 @@ module internal MoveGenerator =
           |> Map.toList |> List.filter (fun (_, x) -> ((wordExists st x) && (wordOnBoard st x))) 
           |> fun x -> snd (Seq.maxBy fst x)
 
-    let findMove (st : State) = collectWords st |> extractResult st
-                      
     // Add prefix and postfix
     // Length x width
     // Write horizontal on top of horizontal 
+    let findMove (st : State) = collectWords st |> extractResult st
+                      
     let convertState b d pn h p t tu = {board = b; dict = d; playerNumber = pn; hand = h; played = p; tiles = t; turns = tu}
