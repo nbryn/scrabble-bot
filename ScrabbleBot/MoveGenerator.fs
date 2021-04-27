@@ -117,7 +117,7 @@ module internal MoveGenerator =
             else stepDictWordExists (word.[1..word.Length-1]) (snd ((Dictionary.step (getChar word.[0]) dict).Value))
 
 
-    let collectWord (st : State) (first : coord*(uint32*(char*int))) coordAdjuster append =
+    let collectWord coordAdjuster append (st : State) (first : coord*(uint32*(char*int)))  =
         let rec go word c =
             if   squareExistsAndNotFree st c
             then let newWord = if append then [c, (Map.find c st.played)]@word else word@[c, (Map.find c st.played)]
@@ -127,9 +127,15 @@ module internal MoveGenerator =
         go [first] (coordAdjuster (fst first))
 
 
+    let collectWordXInc = collectWord incrementX false
+    let collectWordXDec = collectWord decrementX false
+    let collectWordYInc = collectWord incrementY false
+    let collectWordYDec = collectWord decrementY true
+
     // Mathc checdkHorizontal with -> include points
     // Dont check vertical on first
-    let findValidWords (st : State) coord startingPoint coordAdjuster checker append =
+    // Inject wordAppender
+    let findValidWords coordAdjuster checker append (st : State) coord startingPoint   =
         let rec go hand word existing c words =
             if not (squareExist st (coordAdjuster c)) then words
             else
@@ -149,6 +155,11 @@ module internal MoveGenerator =
         go (MultiSet.toList st.hand) [] startingPoint coord Map.empty
 
 
+    let findValidWordsXInc = findValidWords incrementX checkVertical false
+    let findValidWordsXDec = findValidWords decrementX checkVertical true
+    let findValidWordsYInc = findValidWords incrementY checkHorizontal false
+    let findValidWordsYDec = findValidWords decrementY checkHorizontal true
+
     // Include point from all words -> include points from squares
     // Try place word before, after & in middle
     // Check in front of curren tile - Eg checkHorizontal on Horizontal placement not only vertical
@@ -159,16 +170,17 @@ module internal MoveGenerator =
        | ((_,false), (_,false)) -> None
        // Problems with placing tiles on occupied square
        | ((_,true), (_,true))   -> if st.turns = 0 
-                                   then Some (findValidWords st (fst first) [] incrementX checkVertical false)
+                                   then Some (findValidWordsXInc st (fst first) [])
                                    else
-                                   findValidWords st (incrementX (fst first)) [first] incrementX checkVertical false
-                                   |> fun x -> Some (Map.fold (fun acc key value -> Map.add key value acc) x (findValidWords st (decrementX (fst first)) [first] decrementX checkVertical true))
+                                   findValidWordsXInc st (incrementX (fst first)) [first]
+                                   |> fun x -> Some (Map.fold (fun acc key value -> 
+                                                     Map.add key value acc) x (findValidWordsXDec st (decrementX (fst first)) [first]))
                             
-       | ((_,true), (_,_))      -> let existingWord = collectWord st first incrementX false
-                                   Some (findValidWords st (decrementX (fst first)) existingWord decrementX checkVertical true)
+       | ((_,true), (_,_))      -> let existingWord = collectWordXInc st first 
+                                   Some (findValidWordsXDec st (decrementX (fst first)) existingWord)
       
-       | ((_,_), (_,true))      -> let existingWord = collectWord st first decrementX false          
-                                   Some (findValidWords st (decrementXTimes (fst first) existingWord.Length) existingWord decrementX checkVertical true)
+       | ((_,_), (_,true))      -> let existingWord = collectWordXDec st first          
+                                   Some (findValidWordsXDec st (decrementXTimes (fst first) existingWord.Length) existingWord)
 
                             
     let tryVertical (st : State) (first : coord*(uint32*(char*int))) =
@@ -176,16 +188,17 @@ module internal MoveGenerator =
        | ((false,_), (false,_)) -> None
        | ((_,false), (_,false)) -> None                           
        | ((_,true), (_,true))   -> if st.turns = 0 
-                                   then Some (findValidWords st (fst first) [] incrementY checkHorizontal false)
+                                   then Some (findValidWordsYInc st (fst first) [])
                                    else
-                                   findValidWords st (incrementY (fst first)) [first] incrementY checkHorizontal false
-                                   |> fun x -> Some (Map.fold (fun acc key value -> Map.add key value acc) x (findValidWords st (decrementY (fst first)) [first] decrementY checkHorizontal true))
+                                   findValidWordsYInc st (incrementY (fst first)) [first]
+                                   |> fun x -> Some (Map.fold (fun acc key value -> 
+                                                     Map.add key value acc) x (findValidWordsYDec st (decrementY (fst first)) [first]))
                
-       | ((_,true), (_,_))    -> let existingWord = collectWord st first incrementY false          
-                                 Some (findValidWords st (decrementYTimes (fst first) existingWord.Length) existingWord decrementY checkHorizontal true)
+       | ((_,true), (_,_))    -> let existingWord = collectWordYInc st first          
+                                 Some (findValidWordsYDec st (decrementYTimes (fst first) existingWord.Length) existingWord)
 
-       | ((_,_), (_,true))    -> let existingWord = collectWord st first decrementY true
-                                 Some (findValidWords st (incrementY (fst first)) existingWord incrementY checkHorizontal false)
+       | ((_,_), (_,true))    -> let existingWord = collectWordYDec st first
+                                 Some (findValidWordsYInc st (incrementY (fst first)) existingWord)
 
     let collectWords (st : State) =
         st.played |> Map.toList |> List.map (fun coord -> tryHorizontal st coord) 
@@ -201,7 +214,7 @@ module internal MoveGenerator =
 
     // Add prefix and postfix
     // Length x width
-    // Write horizontal on top of horizontal 
+    // Write horizontal after checking vertical 
     let findMove (st : State) = collectWords st |> extractResult st
                       
     let convertState b d pn h p t tu = {board = b; dict = d; playerNumber = pn; hand = h; played = p; tiles = t; turns = tu}
