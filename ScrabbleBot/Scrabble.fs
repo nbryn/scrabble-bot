@@ -68,14 +68,13 @@ module Scrabble =
         let rec aux (st : State.state) =
             Print.printHand pieces (State.hand st)
 
-            // remove the force print when you move on from manual input (or when you have learnt the format)
-            forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
-            //let input =  System.Console.ReadLine()
             let move = findMove (convertState st.board st.dict st.playerNumber st.hand st.played st.tiles st.turns)
-
             debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
-            send cstream (SMPlay move)
-
+            
+            match move with
+            | SMPlay move   -> send cstream (SMPlay move)
+            | SMChange move -> send cstream (SMChange move)
+            
             let msg = recv cstream
             debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
 
