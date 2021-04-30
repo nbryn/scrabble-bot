@@ -91,6 +91,11 @@ module Scrabble =
                 
                 let newState = State.mkState st.board st.dict st.playerNumber newHand played st.tiles (st.turns + 1)
                 aux newState
+            | RCM (CMChangeSuccess(newPieces)) ->
+                let newHand = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty newPieces
+
+                let newState = State.mkState st.board st.dict st.playerNumber newHand st.played st.tiles (st.turns + 1)
+                aux newState
             | RCM (CMPlayed (pid, ms, points)) ->
                 (* Successful play by other player. Update your state *)
                 let st' = st // This state needs to be updated
@@ -133,7 +138,5 @@ module Scrabble =
         let convertTile (t : tile) = Set.toList t |> fun x -> x.[0]
 
         let t = Map.map (fun _ x -> convertTile x) tiles
-
-        let h = convertTile (Map.find (uint32 1) tiles)
 
         fun () -> playGame cstream t (State.mkState board dict playerNumber handSet (Map.ofList [(board.center, (uint32 3, convertTile(Map.find (uint32 3) tiles)))]) t 0) 
