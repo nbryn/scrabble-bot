@@ -1,10 +1,8 @@
 namespace nbryn
-open Parser
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
 
 module internal MoveGenerator =
-  
     type State = {
         board         : Parser.board
         dict          : Dictionary.Dict
@@ -13,6 +11,7 @@ module internal MoveGenerator =
         played        : Map<coord, (uint32*(char*int))>
         tiles         : Map<uint32, char*int>
         turns         : int
+        failedPlays   : List<List<coord*(uint32*(char*int))>>
     }
 
     type Surrounding = (bool*bool)*(bool*bool)
@@ -104,20 +103,13 @@ module internal MoveGenerator =
        | ((true,false),(false,_))    -> wordExists st (collectWordXDec st word)
        | ((true,false),(_,_))        -> wordExists st (collectWordXDec st word)
  
-
-    let getChar (s : (coord*(uint32*(char*int)))) = fst (snd((snd s)))
-
     let calcPoint (l : List<coord*(uint32*(char*int))>) = List.fold (fun acc (x, (y, (z,x))) -> acc + x) 0 l
-
-    let rec stepDictWordExists (word : List<coord*(uint32*(char*int))>) (dict : Dictionary.Dict) =
-            if List.isEmpty word then dict
-            else stepDictWordExists (word.[1..word.Length-1]) (snd ((Dictionary.step (getChar word.[0]) dict).Value))
 
     // Use special checker for  
     let check1 collector coordAdjuster state coord word =
         match squareExistsAndFree2 state (coordAdjuster coord) with
         | (_,true)      -> true
-        | (false,false) -> false
+        | (false,_)     -> false
         | (true,false)  -> wordExists state (collector state word)
 
     let check1XDec = check1 collectWordXDec decrementX
@@ -125,9 +117,8 @@ module internal MoveGenerator =
     let check1YDec = check1 collectWordYDec decrementY
     let check1YInc = check1 collectWordYInc incrementY
 
-    // Mathc checdkHorizontal with -> include points
+    // Match checkHorizontal with -> include points
     // Check horizontal on vertical and vice verce - Start from -/+1 and collect words
-    // If last move failed - Don't play again
     // Merge checker and check1?
     // Look ahead does not work
     // Merge all checkers in one function?
@@ -139,7 +130,7 @@ module internal MoveGenerator =
                                           if (not (checker st c [(c, (k, charr))]) || not (check1 st c newExisting))
                                           then words
                                           else                           
-                                          if  wordExists st newExisting
+                                          if   wordExists st newExisting
                                           then Map.fold (fun acc key value -> 
                                                Map.add key value acc) (go (removeFirst (fun m -> m = k ) hand) newWord newExisting (coordAdjuster c) (Map.add (calcPoint newWord) newWord words)) x 
                                           else Map.fold (fun acc key value -> 
@@ -157,8 +148,8 @@ module internal MoveGenerator =
 
     // Include point from all words -> include points from squares
     // Try place word before, after & in middle
-    // Check in front of curren tile - Eg checkHorizontal on Horizontal placement not only vertical
-    // Change tiles if no options
+    // Remove st.turns
+    // Place words horizontal on top of horizontal
     let tryHorizontal (st : State) (first : coord*(uint32*(char*int))) =
        match horizontalChecker st (fst first) with
        | ((false,_), (false,_)) -> None
@@ -197,11 +188,14 @@ module internal MoveGenerator =
         st.played |> Map.toList |> List.map (fun coord -> tryHorizontal st coord) 
                   |> fun x -> (List.map (fun coord -> tryVertical st coord) (Map.toList st.played)) @ x
 
-    let wordOnBoard (st : State) word = word |> List.forall (fun x -> squareExistsAndFree st (fst x))
+    let wordOnBoard (st : State) word = word |> List.forall (fun x -> if st.turns = 0 then true else squareExistsAndFree st (fst x))
+
+    let validWord (st : State) word = List.forall (fun x -> x <> word) st.failedPlays
+                                      
 
     let extractResult (st : State) (l : list<Map<int,list<coord * (uint32 * (char * int))>>>) =
         l |> List.fold (fun acc value -> Map.fold (fun a k v -> Map.add k v a) acc value) Map.empty
-          |> Map.toList |> List.filter (fun (_, x) -> wordOnBoard st x) 
+          |> Map.toList |> List.filter (fun (_, x) -> wordOnBoard st x && validWord st x) 
           |> fun x -> snd (Seq.maxBy fst x)
 
     // Add prefix and postfix
@@ -211,4 +205,4 @@ module internal MoveGenerator =
         collectWords st |> List.filter (fun x -> x.IsSome) |> List.map (fun x -> x.Value) |> List.filter (fun x -> not (Map.isEmpty x))
         |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else SMPlay (extractResult st x)
                       
-    let convertState b d pn h p t tu = {board = b; dict = d; playerNumber = pn; hand = h; played = p; tiles = t; turns = tu}
+    let convertState b d pn h p t tu fp = {board = b; dict = d; playerNumber = pn; hand = h; played = p; tiles = t; turns = tu; failedPlays = fp;}

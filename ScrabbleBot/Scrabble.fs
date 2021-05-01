@@ -51,9 +51,10 @@ module State =
         played        : Map<coord, (uint32*(char*int))>
         tiles         : Map<uint32, char*int>
         turns         : int
+        failedPlays   : List<List<coord*(uint32*(char*int))>>
     }
 
-    let mkState b d pn h p t tu = {board = b; dict = d;  playerNumber = pn; hand = h; played = p; tiles = t; turns = tu}
+    let mkState b d pn h p t tu fp = {board = b; dict = d;  playerNumber = pn; hand = h; played = p; tiles = t; turns = tu; failedPlays = fp;}
 
     let board st         = st.board
     let dict st          = st.dict
@@ -68,15 +69,15 @@ module Scrabble =
         let rec aux (st : State.state) =
             Print.printHand pieces (State.hand st)
 
-            let move = findMove (convertState st.board st.dict st.playerNumber st.hand st.played st.tiles st.turns)
-            debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
-            
+            let move = findMove (convertState st.board st.dict st.playerNumber st.hand st.played st.tiles st.turns st.failedPlays)
+            debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move)
+           
             match move with
             | SMPlay move   -> send cstream (SMPlay move)
             | SMChange move -> send cstream (SMChange move)
             
             let msg = recv cstream
-            debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
+            debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.playerNumber st) move)
 
             match msg with
             | RCM (CMPlaySuccess(ms, points, newPieces)) ->
@@ -89,26 +90,26 @@ module Scrabble =
                 let tempHand = List.fold (fun acc (x, _) -> MultiSet.removeSingle x acc) st.hand oldTiles
                 let newHand = List.fold (fun acc (x, k) -> MultiSet.add x k acc) tempHand newPieces
                 
-                let newState = State.mkState st.board st.dict st.playerNumber newHand played st.tiles (st.turns + 1)
+                let newState = State.mkState st.board st.dict st.playerNumber newHand played st.tiles (st.turns + 1) st.failedPlays
                 aux newState
             | RCM (CMChangeSuccess(newPieces)) ->
                 let newHand = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty newPieces
 
-                let newState = State.mkState st.board st.dict st.playerNumber newHand st.played st.tiles (st.turns + 1)
+                let newState = State.mkState st.board st.dict st.playerNumber newHand st.played st.tiles (st.turns + 1) st.failedPlays
                 aux newState
             | RCM (CMPlayed (pid, ms, points)) ->
                 (* Successful play by other player. Update your state *)
-                let st' = st // This state needs to be updated
+                let st' = st
                 aux st'
-            | RCM (CMPlayFailed (pid, ms)) ->
-                (* Failed play. Update your state *)
-                let st' = st // This state needs to be updated
-                aux st'
+            | RCM (CMPlayFailed (pid, ms)) ->          
+                let newState = State.mkState st.board st.dict st.playerNumber st.hand st.played st.tiles (st.turns + 1) ([ms]@st.failedPlays)
+                aux newState
             | RCM (CMGameOver _) -> ()
-            | RCM a -> failwith (sprintf "not implmented: %A" a)
-            | RGPE err -> printfn "Gameplay Error:\n%A" err; aux st
-
-
+            | RGPE err ->
+                match move with
+                SMPlay move -> let newState = State.mkState st.board st.dict st.playerNumber st.hand st.played st.tiles (st.turns + 1) ([move]@st.failedPlays)
+                               aux newState
+                    
         aux st
 
     let startGame 
@@ -129,8 +130,7 @@ module Scrabble =
                       hand =  %A
                       timeout = %A\n\n" numPlayers playerNumber playerTurn hand timeout)
 
-        //let dict = dictf true // Uncomment if using a gaddag for your dictionary
-        let dict = dictf false // Uncomment if using a trie for your dictionary
+        let dict = dictf false
         let board = Parser.parseBoardProg boardP
                   
         let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
@@ -139,4 +139,4 @@ module Scrabble =
 
         let t = Map.map (fun _ x -> convertTile x) tiles
 
-        fun () -> playGame cstream t (State.mkState board dict playerNumber handSet (Map.ofList [(board.center, (uint32 3, convertTile(Map.find (uint32 3) tiles)))]) t 0) 
+        fun () -> playGame cstream t (State.mkState board dict playerNumber handSet (Map.ofList [(board.center, (uint32 3, convertTile(Map.find (uint32 3) tiles)))]) t 0 List.empty)

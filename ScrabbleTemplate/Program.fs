@@ -33,9 +33,6 @@ let main argv =
 //    let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoard ()
 //    let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoardSeed (Some 42)
 
-//    let board      = ScrabbleUtil.HoleBoard.holeBoard ()
-//    let board      = ScrabbleUtil.InfiniteHoleBoard.infiniteHoleBoard ()
-
     //let words     = readLines @"ScrabbleTemplate\Dictionaries\English.txt"
     let words     = readLines @"..\ScrabbleTemplate\Dictionaries\English.txt"
 
@@ -46,15 +43,13 @@ let main argv =
     let port       = 13001
 
     //let players = spawnMultiples "OxyphenButazone" Oxyphenbutazone.Scrabble.startGame 2
-    // Uncomment this line to call your client
     let players    = [("nbryn", nbryn.Scrabble.startGame)]
     let (dictionary, time) =
         time (fun () -> ScrabbleUtil.Dictionary.mkDict
                             Dictionary.empty
                             Dictionary.insert
                             Dictionary.step
-//                            (Some Dictionary.reverse) // Use if you have implemented a Gaddag
-                            None                        // Use if you have not implemented a Gaddag
+                            None              
                             words)
 
     do ScrabbleServer.Comm.startGame 
