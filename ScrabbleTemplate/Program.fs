@@ -25,7 +25,7 @@ let main argv =
     System.Console.Clear()
 
 
-    let board        = ScrabbleUtil.StandardBoard.standardBoard ()
+//    let board        = ScrabbleUtil.StandardBoard.standardBoard ()
 //    let board      = ScrabbleUtil.InfiniteBoard.infiniteBoard ()
 
 //    let board      = ScrabbleUtil.RandomBoard.randomBoard ()
@@ -33,7 +33,7 @@ let main argv =
 //    let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoard ()
 //    let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoardSeed (Some 42)
 
-//    let board      = ScrabbleUtil.HoleBoard.holeBoard ()
+    let board      = ScrabbleUtil.HoleBoard.holeBoard ()
 //    let board      = ScrabbleUtil.InfiniteHoleBoard.infiniteHoleBoard ()
 
 //    let words     = readLines @"ScrabbleTemplate\Dictionaries\English.txt"
