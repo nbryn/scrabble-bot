@@ -9,6 +9,7 @@
         center        : coord
         defaultSquare : square
         squares       : boardFun
+        isInfinite    : bool
     }
 
     val parseBoardProg : boardProg -> board

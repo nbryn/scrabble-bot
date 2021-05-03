@@ -142,6 +142,7 @@
         center        : coord
         defaultSquare : square
         squares       : boardFun
+        isInfinite    : bool
     }
 
     let parseBoardProg (bp : boardProg) : board = 
@@ -149,6 +150,7 @@
          center = bp.center
          defaultSquare = parseSquareFun (Map.find bp.usedSquare bp.squares)
          squares = Map.map (fun _ y -> parseSquareFun y) bp.squares |> parseBoardFun bp.prog
+         isInfinite = bp.isInfinite
         }
 
 

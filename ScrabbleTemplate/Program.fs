@@ -33,7 +33,10 @@ let main argv =
 //    let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoard ()
 //    let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoardSeed (Some 42)
 
-    //let words     = readLines @"ScrabbleTemplate\Dictionaries\English.txt"
+//    let board      = ScrabbleUtil.HoleBoard.holeBoard ()
+//    let board      = ScrabbleUtil.InfiniteHoleBoard.infiniteHoleBoard ()
+
+//    let words     = readLines @"ScrabbleTemplate\Dictionaries\English.txt"
     let words     = readLines @"..\ScrabbleTemplate\Dictionaries\English.txt"
 
     let handSize   = 7u
