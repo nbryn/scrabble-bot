@@ -25,7 +25,7 @@ let main argv =
     System.Console.Clear()
 
 
-//    let board        = ScrabbleUtil.StandardBoard.standardBoard ()
+    let board        = ScrabbleUtil.StandardBoard.standardBoard ()
 //    let board      = ScrabbleUtil.InfiniteBoard.infiniteBoard ()
 
 //    let board      = ScrabbleUtil.RandomBoard.randomBoard ()
@@ -33,8 +33,9 @@ let main argv =
 //    let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoard ()
 //    let board      = ScrabbleUtil.InfiniteRandomBoard.infiniteRandomBoardSeed (Some 42)
 
-    let board      = ScrabbleUtil.HoleBoard.holeBoard ()
+//    let board      = ScrabbleUtil.HoleBoard.holeBoard ()
 //    let board      = ScrabbleUtil.InfiniteHoleBoard.infiniteHoleBoard ()
+
 
 //    let words     = readLines @"ScrabbleTemplate\Dictionaries\English.txt"
     let words     = readLines @"..\ScrabbleTemplate\Dictionaries\English.txt"
@@ -45,7 +46,8 @@ let main argv =
     let seed       = None
     let port       = 13001
 
-    //let players = spawnMultiples "OxyphenButazone" Oxyphenbutazone.Scrabble.startGame 2
+//    let players    = [("nbryn", nbryn.Scrabble.startGame); ("OxyphenButazone", Oxyphenbutazone.Scrabble.startGame)]
+//    let players = spawnMultiples "nbryn" nbryn.Scrabble.startGame 2
     let players    = [("nbryn", nbryn.Scrabble.startGame)]
     let (dictionary, time) =
         time (fun () -> ScrabbleUtil.Dictionary.mkDict

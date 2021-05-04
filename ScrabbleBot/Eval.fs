@@ -144,7 +144,7 @@
     let stmntToBoardFun (stm : stm) (m : Map<int, 'a>) =
         fun (x,y) ->
         mkState [("_x_", x); ("_y_", y); ("_result_", 0)] [] ["_x_"; "_y_"; "_result_"]
-        |> fun s -> stmntEval stm >>>= lookup "_result_" >>= (fun x -> ret (Map.tryFind x m)) |>
-        fun m -> match evalSM s m with
-                 | Success (r) -> r
-                 | Failure (_) -> None
+        |> fun s -> stmntEval stm >>>= lookup "_result_" >>= (fun x -> ret (Map.tryFind x m)) |> fun m -> 
+        match evalSM s m with
+        | Success (r) -> r
+        | Failure (_) -> None

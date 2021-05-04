@@ -8,16 +8,15 @@ module internal MoveGenerator =
     type State = {
         board         : Parser.board
         dict          : Dictionary.Dict
-        playerNumber  : uint32
         hand          : MultiSet.MultiSet<uint32>
         played        : Map<coord, char*int>
         tiles         : Map<uint32, char*int>
-        turns         : int
+        placeCenter   : bool
         failedPlays   : List<List<coord*(uint32*(char*int))>>
         invalidCoords : Set<coord>
     }
 
     val findMove     : State -> ServerMessage
-    val convertState : Parser.board -> Dictionary.Dict -> uint32 -> MultiSet<uint32> -> 
-                       Map<coord, char*int> -> Map<uint32, char*int> -> int -> 
+    val convertState : Parser.board -> Dictionary.Dict -> MultiSet<uint32> -> 
+                       Map<coord, char*int> -> Map<uint32, char*int> -> bool -> 
                        List<List<coord*(uint32*(char*int))>> -> Set<coord> -> State

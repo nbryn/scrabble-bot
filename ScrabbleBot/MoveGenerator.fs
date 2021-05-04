@@ -6,11 +6,10 @@ module internal MoveGenerator =
     type State = {
         board         : Parser.board
         dict          : Dictionary.Dict
-        playerNumber  : uint32
         hand          : MultiSet.MultiSet<uint32>
         played        : Map<coord, char*int>
         tiles         : Map<uint32, char*int>
-        turns         : int
+        placeCenter   : bool
         failedPlays   : List<List<coord*(uint32*(char*int))>>
         invalidCoords : Set<coord>
     }
@@ -36,6 +35,11 @@ module internal MoveGenerator =
         match Set.contains coord st.invalidCoords with
         | false -> if st.board.isInfinite then true else ((fst coord) < 8 && (fst coord) > -8) && ((snd coord) < 8 && (snd coord) > -8)
         | true  -> false
+
+    let squareExist2 (st : State) (coord : coord) =
+        match st.board.squares (decrementXTimes coord 500) with
+        | Some s -> true
+        | None   -> false
 
 
     let squareFree (st : State) (coord : coord) =
@@ -179,10 +183,7 @@ module internal MoveGenerator =
        match horizontalChecker st (fst first) with
        | ((false,_), (false,_)) -> None
        | ((_,false), (_,false)) -> None
-       | ((_,true), (_,true))   -> if st.turns = 0 
-                                   then Some (findValidWordsXInc st (fst first) [])
-                                   else
-                                   findValidWordsXInc st (incrementX (fst first)) [first]
+       | ((_,true), (_,true))   -> findValidWordsXInc st (incrementX (fst first)) [first]
                                    |> fun x -> Some (Map.fold (fun acc key value -> 
                                                      Map.add key value acc) x (findValidWordsXDec st (decrementX (fst first)) [first]))
                             
@@ -196,10 +197,7 @@ module internal MoveGenerator =
        match verticalChecker st (fst first) with
        | ((false,_), (false,_)) -> None
        | ((_,false), (_,false)) -> None                           
-       | ((_,true), (_,true))   -> if st.turns = 0 
-                                   then Some (findValidWordsYInc st (fst first) [])
-                                   else
-                                   findValidWordsYInc st (incrementY (fst first)) [first]
+       | ((_,true), (_,true))   -> findValidWordsYInc st (incrementY (fst first)) [first]
                                    |> fun x -> Some (Map.fold (fun acc key value -> 
                                                      Map.add key value acc) x (findValidWordsYDec st (decrementY (fst first)) [first]))
                
@@ -212,7 +210,7 @@ module internal MoveGenerator =
         st.played |> Map.toList |> List.map (fun char -> tryHorizontal st char) 
                   |> fun x -> (List.map (fun char -> tryVertical st char) (Map.toList st.played)) @ x
 
-    let wordOnBoard (st : State) word = word |> List.forall (fun x -> if st.turns = 0 then true else squareExistsAndFree st (fst x))
+    let wordOnBoard (st : State) word = word |> List.forall (fun x -> squareExistsAndFree st (fst x))
     let validWord (st : State) word = List.forall (fun x -> x <> word) st.failedPlays
     let validCoords (st : State) word = List.forall (fun c -> List.forall (fun x -> fst x <> c) word) (List.ofSeq st.invalidCoords)
                                       
@@ -222,12 +220,16 @@ module internal MoveGenerator =
           |> Map.toList |> List.filter (fun (_, x) -> wordOnBoard st x && validWord st x && validCoords st x) 
           |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else SMPlay (snd (Seq.maxBy fst x))
 
+   
+    let removeNone (l : list<option<Map<int, List<coord*(uint32*(char*int))>>>>) = l |> List.filter (fun x -> x.IsSome) |> List.map (fun x -> x.Value) |> List.filter (fun x -> not (Map.isEmpty x))
+
     // Add prefix and postfix
     // Length x width
     // Write horizontal after checking vertical
     // Wildcard? 
     let findMove (st : State) = 
-        collectWords st |> List.filter (fun x -> x.IsSome) |> List.map (fun x -> x.Value) |> List.filter (fun x -> not (Map.isEmpty x))
-        |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else extractResult st x
+        if st.placeCenter then findValidWordsXInc st (0, 0) [] |> Map.toList 
+                                                               |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else SMPlay (snd (Seq.maxBy fst x))
+        else collectWords st |> removeNone |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else extractResult st x
                       
-    let convertState b d pn h p t tu fp ic = {board = b; dict = d; playerNumber = pn; hand = h; played = p; tiles = t; turns = tu; failedPlays = fp; invalidCoords = ic;}
+    let convertState b d h p t pc fp ic = {board = b; dict = d; hand = h; played = p; tiles = t; placeCenter = pc; failedPlays = fp; invalidCoords = ic;}
