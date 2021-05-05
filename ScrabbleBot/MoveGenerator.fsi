@@ -13,10 +13,9 @@ module internal MoveGenerator =
         tiles         : Map<uint32, char*int>
         placeCenter   : bool
         failedPlays   : List<List<coord*(uint32*(char*int))>>
-        invalidCoords : Set<coord>
     }
 
     val findMove     : State -> ServerMessage
     val convertState : Parser.board -> Dictionary.Dict -> MultiSet<uint32> -> 
                        Map<coord, char*int> -> Map<uint32, char*int> -> bool -> 
-                       List<List<coord*(uint32*(char*int))>> -> Set<coord> -> State
+                       List<List<coord*(uint32*(char*int))>> -> State

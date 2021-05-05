@@ -3,6 +3,8 @@ open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
 
 module internal MoveGenerator =
+
+
     type State = {
         board         : Parser.board
         dict          : Dictionary.Dict
@@ -11,11 +13,27 @@ module internal MoveGenerator =
         tiles         : Map<uint32, char*int>
         placeCenter   : bool
         failedPlays   : List<List<coord*(uint32*(char*int))>>
-        invalidCoords : Set<coord>
     }
 
     type Surrounding = (bool*bool)*(bool*bool)
 
+    // Move to utility
+    let memoize fn =
+      let cache = new System.Collections.Generic.Dictionary<_,_>()
+      (fun state coord ->
+        match cache.TryGetValue coord with
+        | true, v  -> v
+        | false, _ -> let v = fn state coord
+                      cache.Add(coord,v)
+                      v)
+
+    let rec removeFirst pred lst =
+        match lst with
+        | h::t when pred h -> t
+        | h::t -> h::removeFirst pred t
+        | _ -> []
+
+    // Move to board helpers
     let incrementX (c : coord) : coord  = (fst c + 1, snd c)
     let decrementX (c : coord) : coord  = (fst c - 1, snd c)
     let incrementY (c : coord) : coord  = (fst c, snd c + 1)
@@ -30,17 +48,12 @@ module internal MoveGenerator =
     let incrementYTimes (c : coord) (amount : int) : coord = (fst c + amount, snd c)
     let decrementYTimes (c : coord) (amount : int) : coord = (fst c - amount, snd c)
         
-    // Need to look at function from map
     let squareExist (st : State) (coord : coord) =
-        match Set.contains coord st.invalidCoords with
-        | false -> if st.board.isInfinite then true else ((fst coord) < 8 && (fst coord) > -8) && ((snd coord) < 8 && (snd coord) > -8)
-        | true  -> false
-
-    let squareExist2 (st : State) (coord : coord) =
-        match st.board.squares (decrementXTimes coord 500) with
-        | Some s -> true
+        match st.board.squares coord with
+        | Some _ -> true
         | None   -> false
 
+    let memSquareExists = memoize squareExist
 
     let squareFree (st : State) (coord : coord) =
         match Map.tryFind coord st.played with
@@ -48,26 +61,21 @@ module internal MoveGenerator =
         | None   -> true
 
     let squareExistsAndFree (st : State) (coord : coord) =
-        squareExist st coord && squareFree st coord
+        memSquareExists st coord && squareFree st coord
 
     let squareExistsAndFree2 (st : State) (coord : coord) =
-        ((squareExist st coord), (squareFree st coord))
+        ((memSquareExists st coord), (squareFree st coord))
 
     let squareExistsAndNotFree (st : State) (coord : coord) =
-        squareExist st coord && not(squareFree st coord)
+        memSquareExists st coord && not(squareFree st coord)
 
     let verticalChecker (st : State) (c : coord) : Surrounding = 
-        (squareExist st (decrementY c), (squareExistsAndFree st (decrementY c))),(squareExist st (incrementY c), (squareExistsAndFree st (incrementY c)))
+        (memSquareExists st (decrementY c), (squareExistsAndFree st (decrementY c))),(memSquareExists st (incrementY c), (squareExistsAndFree st (incrementY c)))
         
 
     let horizontalChecker (st : State) (c : coord) : Surrounding = 
-        (squareExist st (decrementX c), (squareExistsAndFree st (decrementX c))),(squareExist st (incrementX c), (squareExistsAndFree st (incrementX c)))
+        (memSquareExists st (decrementX c), (squareExistsAndFree st (decrementX c))),(memSquareExists st (incrementX c), (squareExistsAndFree st (incrementX c)))
 
-    let rec removeFirst pred lst =
-        match lst with
-        | h::t when pred h -> t
-        | h::t -> h::removeFirst pred t
-        | _ -> []
         
     let wordExists (st : State) (list : List<coord*(char*int)>) =
         let word = List.map (fun (_, (y, _)) -> y) list |> List.toArray |> System.String
@@ -232,4 +240,4 @@ module internal MoveGenerator =
                                                                |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else SMPlay (snd (Seq.maxBy fst x))
         else collectWords st |> removeNone |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else extractResult st x
                       
-    let convertState b d h p t pc fp ic = {board = b; dict = d; hand = h; played = p; tiles = t; placeCenter = pc; failedPlays = fp; invalidCoords = ic;}
+    let convertState b d h p t pc fp = {board = b; dict = d; hand = h; played = p; tiles = t; placeCenter = pc; failedPlays = fp;}

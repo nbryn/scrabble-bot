@@ -45,10 +45,9 @@ module State =
         played        : Map<coord, char*int>
         tiles         : Map<uint32, char*int>
         failedPlays   : List<List<coord*(uint32*(char*int))>>
-        invalidCoords : Set<coord>
     }
 
-    let mkState b d np pn pt h p t fp ic = {board = b; dict = d; numPlayers = np; playerNumber = pn; playerTurn = pt; hand = h; played = p; tiles = t; failedPlays = fp; invalidCoords = ic}
+    let mkState b d np pn pt h p t fp = {board = b; dict = d; numPlayers = np; playerNumber = pn; playerTurn = pt; hand = h; played = p; tiles = t; failedPlays = fp;}
 
     let board st         = st.board
     let dict st          = st.dict
@@ -67,7 +66,7 @@ module Scrabble =
             if (shouldPlay) then
                     Print.printHand pieces (State.hand st)
                    
-                    move <- findMove (convertState st.board st.dict st.hand st.played st.tiles placeCenter st.failedPlays st.invalidCoords)
+                    move <- findMove (convertState st.board st.dict st.hand st.played st.tiles placeCenter st.failedPlays)
                     debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move)
                    
                     match move with
@@ -88,18 +87,18 @@ module Scrabble =
                 let tempHand = List.fold (fun acc (x, _) -> MultiSet.removeSingle x acc) st.hand oldTiles
                 let newHand = List.fold (fun acc (x, k) -> MultiSet.add x k acc) tempHand newPieces
                 
-                let newState = State.mkState st.board st.dict st.numPlayers st.playerNumber (changeTurn st) newHand played st.tiles st.failedPlays st.invalidCoords
+                let newState = State.mkState st.board st.dict st.numPlayers st.playerNumber (changeTurn st) newHand played st.tiles st.failedPlays
                 aux newState (if st.numPlayers = uint32 1 then true else false) false
             | RCM (CMChangeSuccess(newPieces)) ->
                 let newHand = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty newPieces
 
-                let newState = State.mkState st.board st.dict st.numPlayers st.playerNumber (changeTurn st) newHand st.played st.tiles st.failedPlays st.invalidCoords
+                let newState = State.mkState st.board st.dict st.numPlayers st.playerNumber (changeTurn st) newHand st.played st.tiles st.failedPlays
                 aux newState (if st.numPlayers = uint32 1 then true else false) false
             | RCM (CMPlayed (pid, ms, points)) ->
                 let lastPlayed = List.map (fun (x, (y, _)) -> (x, (y, (Map.find y pieces)))) ms
                 let played = Map.fold (fun acc key value -> Map.add key value acc) st.played (Map.ofList (List.map (fun (m, (x, (y, z))) -> (m, (y, z))) lastPlayed))
                 
-                let newState = State.mkState st.board st.dict st.numPlayers st.playerNumber (changeTurn st) st.hand played st.tiles st.failedPlays st.invalidCoords
+                let newState = State.mkState st.board st.dict st.numPlayers st.playerNumber (changeTurn st) st.hand played st.tiles st.failedPlays
                 aux newState (pid % st.numPlayers + 1u = st.playerNumber) false
             | RCM (CMPlayFailed (pid, ms)) ->          
                 let st' = st
@@ -112,9 +111,9 @@ module Scrabble =
             | RCM (CMGameOver _) -> ()
             | RGPE err -> match move with
                           SMPlay move -> List.fold (fun st ele -> match ele with
-                                                                  | GPEEmptyTile c           -> State.mkState st.board st.dict st.numPlayers st.playerNumber st.playerTurn st.hand st.played st.tiles st.failedPlays (Set.add c st.invalidCoords)
-                                                                  | GPEWordNotInDictionary _ -> State.mkState st.board st.dict st.numPlayers st.playerNumber st.playerTurn st.hand st.played st.tiles ([move]@st.failedPlays) st.invalidCoords
-                                                                  | GPEWordNotAdjacent _     -> State.mkState st.board st.dict st.numPlayers st.playerNumber st.playerTurn st.hand st.played st.tiles ([move]@st.failedPlays) st.invalidCoords
+                                                                  | GPEEmptyTile c           -> State.mkState st.board st.dict st.numPlayers st.playerNumber st.playerTurn st.hand st.played st.tiles st.failedPlays
+                                                                  | GPEWordNotInDictionary _ -> State.mkState st.board st.dict st.numPlayers st.playerNumber st.playerTurn st.hand st.played st.tiles ([move]@st.failedPlays)
+                                                                  | GPEWordNotAdjacent _     -> State.mkState st.board st.dict st.numPlayers st.playerNumber st.playerTurn st.hand st.played st.tiles ([move]@st.failedPlays)
                                                                   | _                        -> st
                                                    ) st err
 
@@ -152,4 +151,4 @@ module Scrabble =
 
         let t = Map.map (fun _ x -> convertTile x) tiles
 
-        fun () -> playGame cstream t (State.mkState board dict numPlayers playerNumber playerTurn handSet (Map.ofList [(board.center,  convertTile(Map.find (uint32 3) tiles))]) t [] Set.empty)
+        fun () -> playGame cstream t (State.mkState board dict numPlayers playerNumber playerTurn handSet (Map.ofList [(board.center,  convertTile(Map.find (uint32 3) tiles))]) t [])

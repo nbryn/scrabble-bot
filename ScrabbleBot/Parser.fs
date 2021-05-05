@@ -122,7 +122,7 @@
 
     let SkipParse  = pstring "" |>> fun _ -> Skip
     let ITParse    = helper1 pif BTermParse pthen .>>. helper2 .>> many whitespaceChar .>>. SkipParse |>> fun ((x, y), z) -> ITE (x, y, z)
-    let ITEParse   = helper1 pif BTermParse pthen .>>. helper2 .>> many whitespaceChar .>> pelse .>> spaces .>> pchar '{' .>> spaces .>>. StmTermParse .>> spaces .>> pchar '}' |>> fun ((x, y), z) -> ITE (x, y, z)
+    let ITEParse   = helper1 pif BTermParse pthen .>>. helper2 .>> many whitespaceChar .>> pelse .>> spaces .>> pchar '{' .>> spaces .>>. StmTermParse .>> many whitespaceChar .>> pchar '}' |>> fun ((x, y), z) -> ITE (x, y, z)
     let WhileParse = helper1 pwhile BProdParse pdo .>>. helper2 |>> While
     let AssParse     = (((many whitespaceChar >>. pid .>> spaces) .>> pstring ":=") .>> spaces) .>>. TermParse |>> fun (x, y) -> Ass (string x, y)
     let DeclareParse = many whitespaceChar .>> pdeclare .>> spaces1 >>. pid |>> Declare
