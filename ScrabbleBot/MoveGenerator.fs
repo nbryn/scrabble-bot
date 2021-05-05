@@ -4,7 +4,6 @@ open ScrabbleUtil.ServerCommunication
 
 module internal MoveGenerator =
 
-
     type State = {
         board         : Parser.board
         dict          : Dictionary.Dict
@@ -32,6 +31,13 @@ module internal MoveGenerator =
         | h::t when pred h -> t
         | h::t -> h::removeFirst pred t
         | _ -> []
+
+    let removeEmpty (l : list<option<'a>>) = 
+        l |> List.filter (fun x -> x.IsSome) |> List.map (fun x -> x.Value) 
+          |> List.filter (fun x -> not (Map.isEmpty x))
+    
+    let appender word charToAppend = word@[charToAppend]
+    let prepender word charToAppend = [charToAppend]@word
 
     // Move to board helpers
     let incrementX (c : coord) : coord  = (fst c + 1, snd c)
@@ -84,9 +90,6 @@ module internal MoveGenerator =
     let wordExists2 (st : State) (list : List<coord*(uint32*(char*int))>) =
         let word = List.map (fun (_,(_,(y, _))) -> y) list |> List.toArray |> System.String
         Dictionary.lookup word st.dict
-
-    let appender word charToAppend = word@[charToAppend]
-    let prepender word charToAppend = [charToAppend]@word
 
     let collectWord coordAdjuster concat (st : State) (word : List<coord*(char*int)>)  =
         let rec go word c =
@@ -218,26 +221,21 @@ module internal MoveGenerator =
         st.played |> Map.toList |> List.map (fun char -> tryHorizontal st char) 
                   |> fun x -> (List.map (fun char -> tryVertical st char) (Map.toList st.played)) @ x
 
-    let wordOnBoard (st : State) word = word |> List.forall (fun x -> squareExistsAndFree st (fst x))
-    let validWord (st : State) word = List.forall (fun x -> x <> word) st.failedPlays
-    let validCoords (st : State) word = List.forall (fun c -> List.forall (fun x -> fst x <> c) word) (List.ofSeq st.invalidCoords)
-                                      
-
+    let validMove (st : State) word = List.forall (fun x -> x <> word) st.failedPlays
+                                    
     let extractResult (st : State) (l : list<Map<int,list<coord*(uint32*(char * int))>>>) =
         l |> List.fold (fun acc value -> Map.fold (fun a k v -> Map.add k v a) acc value) Map.empty
-          |> Map.toList |> List.filter (fun (_, x) -> wordOnBoard st x && validWord st x && validCoords st x) 
+          |> Map.toList |> List.filter (fun (_, x) -> validMove st x) 
           |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else SMPlay (snd (Seq.maxBy fst x))
-
-   
-    let removeNone (l : list<option<Map<int, List<coord*(uint32*(char*int))>>>>) = l |> List.filter (fun x -> x.IsSome) |> List.map (fun x -> x.Value) |> List.filter (fun x -> not (Map.isEmpty x))
 
     // Add prefix and postfix
     // Length x width
     // Write horizontal after checking vertical
     // Wildcard? 
     let findMove (st : State) = 
-        if st.placeCenter then findValidWordsXInc st (0, 0) [] |> Map.toList 
-                                                               |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else SMPlay (snd (Seq.maxBy fst x))
-        else collectWords st |> removeNone |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else extractResult st x
+        if st.placeCenter then findValidWordsXInc st (0, 0) [] 
+                               |> Map.toList 
+                               |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else SMPlay (snd (Seq.maxBy fst x))
+        else collectWords st |> removeEmpty |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList st.hand) else extractResult st x
                       
     let convertState b d h p t pc fp = {board = b; dict = d; hand = h; played = p; tiles = t; placeCenter = pc; failedPlays = fp;}
