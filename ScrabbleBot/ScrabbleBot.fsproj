@@ -30,6 +30,8 @@ Group name: &lt;Your group name goes here&gt; (optional since this is hosted in 
     <Compile Include="Eval.fs" />
     <Compile Include="Parser.fsi" />
     <Compile Include="Parser.fs" />
+    <Compile Include="Types.fs" />
+    <Compile Include="Utility.fs" />
     <Compile Include="MoveGenerator.fsi" />
     <Compile Include="MoveGenerator.fs" />
     <Compile Include="Scrabble.fsi" />
