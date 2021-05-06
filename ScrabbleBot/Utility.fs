@@ -23,8 +23,8 @@ module internal Utility =
         l |> List.filter (fun x -> x.IsSome) |> List.map (fun x -> x.Value) 
           |> List.filter (fun x -> not (Map.isEmpty x))
     
-    let appender word charToAppend = word@[charToAppend]
-    let prepender word charToAppend = [charToAppend]@word
+    let appender word append = word@append
+    let prepender word prepend = prepend@word
 
 
 module internal BoardUtil =

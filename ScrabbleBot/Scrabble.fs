@@ -151,4 +151,4 @@ module Scrabble =
 
         let t = Map.map (fun _ x -> convertTile x) tiles
 
-        fun () -> playGame cstream t (State.mkState board dict numPlayers playerNumber playerTurn handSet (Map.ofList [(board.center,  convertTile(Map.find (uint32 3) tiles))]) t [])
+        fun () -> playGame cstream t (State.mkState board dict numPlayers playerNumber playerTurn handSet Map.empty t [])
