@@ -110,14 +110,9 @@ module Scrabble =
                 aux st (pid % st.numPlayers + 1u = st.playerNumber) false
             | RCM (CMGameOver _) -> ()
             | RGPE err -> match move with
-                          SMPlay move -> List.fold (fun st ele -> match ele with
-                                                                  | GPEEmptyTile c           -> State.mkState st.board st.dict st.numPlayers st.playerNumber st.playerTurn st.hand st.played st.tiles st.failedPlays
-                                                                  | GPEWordNotInDictionary _ -> State.mkState st.board st.dict st.numPlayers st.playerNumber st.playerTurn st.hand st.played st.tiles ([move]@st.failedPlays)
-                                                                  | GPEWordNotAdjacent _     -> State.mkState st.board st.dict st.numPlayers st.playerNumber st.playerTurn st.hand st.played st.tiles ([move]@st.failedPlays)
-                                                                  | _                        -> st
-                                                   ) st err
-
-                        |> fun x -> aux x (if st.numPlayers = uint32 1 then true else false) false
+                          SMPlay move -> 
+                             let st' = State.mkState st.board st.dict st.numPlayers st.playerNumber st.playerTurn st.hand st.played st.tiles ([move]@st.failedPlays)          
+                             aux st' (if st.numPlayers = uint32 1 then true else false) false
 
         if (st.playerTurn = st.playerNumber) then
             aux st true true
