@@ -120,24 +120,17 @@ module internal MoveGenerator =
     let findValidWordsYDec = findValidWords decrementY checkYDec prepender prepender
 
     // Merge into one and move to util?
-    let apply firstF secondF firstAdjuster secondAdjuster state char (existing : List<coord * (char * int)> * int) =
-        firstF state (firstAdjuster (fst char)) existing
+    let apply collector firstF secondF fAdjuster sAdjuster state char xt  =
+        let (existing : List<coord * (char * int)> * int) = collector state [char]
+        firstF state (if xt then fAdjuster (fst char) else sAdjuster (fst existing).Length (fst char)) existing
         |> fun x -> Some (Map.fold (fun acc key value ->
-                          Map.add key value acc) x (secondF state (secondAdjuster (fst char) (fst existing).Length) existing))
-
+                          Map.add key value acc) x (secondF state (if xt then sAdjuster (fst existing).Length (fst char) else fAdjuster (fst char)) existing))
 
     let apply2 firstF secondF firstAdjuster secondAdjuster state char =
         firstF state (firstAdjuster (fst char)) ([char], 0)
         |> fun x -> Some (Map.fold (fun acc key value ->
                           Map.add key value acc) x (secondF state (secondAdjuster (fst char)) ([char], 0)))
 
-
-
-    let apply3 firstF secondF firstAdjuster secondAdjuster state char (existing : List<coord * (char * int)> * int) =
-        firstF state (firstAdjuster (fst char) (fst existing).Length)  existing
-        |> fun x -> Some (Map.fold (fun acc key value ->
-                          Map.add key value acc) x (secondF state (secondAdjuster (fst char))  existing))
-                  
     // Include point from all words -> include points from squares 
     // Try with first char in middle of word   
     // Wildcard? 
@@ -151,9 +144,9 @@ module internal MoveGenerator =
        | ((_,false), (_,false)) -> None
        | ((_,true), (_,true))   -> apply2 findValidWordsXInc findValidWordsXDec incrementX decrementX st first
        
-       | ((_,true), (_,_))      -> collectWordXInc st [first] |> apply findValidWordsXDec findValidWordsXInc decrementX incrementXTimes st first              
+       | ((_,true), (_,_))      -> apply collectWordXInc findValidWordsXDec findValidWordsXInc decrementX incrementXTimes st first true              
                                                             
-       | ((_,_), (_,true))      -> collectWordXDec st [first] |> apply findValidWordsXInc findValidWordsXDec incrementX decrementXTimes st first
+       | ((_,_), (_,true))      -> apply collectWordXDec findValidWordsXInc findValidWordsXDec incrementX decrementXTimes st first true
 
              
     // Problems with looking hortizontal on vertical inc
@@ -163,8 +156,8 @@ module internal MoveGenerator =
        | ((_,false), (_,false)) -> None                           
        | ((_,true), (_,true))   -> apply2 findValidWordsYInc findValidWordsYDec incrementY decrementY st first
                                     
-       | ((_,true), (_,_))      -> collectWordYInc st [first] |> apply findValidWordsYDec findValidWordsYInc decrementY incrementYTimes st first
-       | ((_,_), (_,true))      -> collectWordYDec st [first] |> apply3 findValidWordsYDec findValidWordsYInc decrementYTimes incrementY st first
+       | ((_,true), (_,_))      -> apply collectWordYInc findValidWordsYDec findValidWordsYInc decrementY incrementYTimes st first true
+       | ((_,_), (_,true))      -> apply collectWordYDec findValidWordsYDec findValidWordsYInc incrementY decrementYTimes st first false
     
     
     let collectWords state =

@@ -1,7 +1,6 @@
 namespace nbryn
 
 open ScrabbleUtil
-
 module internal Utility =
   
     let memoize fn =
@@ -31,20 +30,27 @@ module internal BoardUtil =
     open Utility
     open Types
 
-    let incrementX (c : coord) : coord  = (fst c + 1, snd c)
-    let decrementX (c : coord) : coord  = (fst c - 1, snd c)
-    let incrementY (c : coord) : coord  = (fst c, snd c + 1)
-    let decrementY (c : coord) : coord  = (fst c, snd c - 1)
+    let incrementXTimes amount coord  : coord = (fst coord + amount, snd coord)
+    let decrementXTimes amount coord  : coord = (fst coord - amount, snd coord)
+    let incrementYTimes amount coord : coord = (fst coord, snd coord + amount)
+    let decrementYTimes amount coord : coord = (fst coord, snd coord - amount)
 
-    let incrementXAndY c = incrementX c |> incrementY
-    let decrementXAndY c = decrementX c |> decrementY
+    let incrementX c : coord  = incrementXTimes 1 c
+    let decrementX c : coord  = decrementXTimes 1 c
+    let incrementY c : coord  = incrementYTimes 1 c
+    let decrementY c : coord  = decrementYTimes 1 c
 
-    let incrementXTimes (c : coord) (amount : int) : coord = (fst c + amount, snd c)
-    let decrementXTimes (c : coord) (amount : int) : coord = (fst c - amount, snd c)
 
-    let incrementYTimes (c : coord) (amount : int) : coord = (fst c + amount, snd c)
-    let decrementYTimes (c : coord) (amount : int) : coord = (fst c - amount, snd c)
-        
+    let incOrDec amount c adjuster x =
+        match x with
+        | true -> adjuster amount c
+        | _   -> decrementXTimes amount c
+    
+    let incOrDecY amount c inc =
+        match inc with
+        | true -> incrementYTimes amount c
+        | _   -> decrementYTimes amount c
+
     let squareExist (st : State) (coord : coord) =
         match st.board.squares coord with
         | Some _ -> true
