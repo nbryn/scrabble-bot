@@ -29,39 +29,38 @@ module internal MoveGenerator =
     let checkWordYDec = checkWord collectWordYDec
 
     // Remember merge
+    // Fewer cases
     let checkVertical (st : State) (c : coord) (word : List<coord*(char*int)>) =
        match verticalChecker st c with
-       | ((_,true),(_,true))         -> (true, 0)
-       | ((false,_),(false,_))       -> (false, 0)  
-       | ((_,true),(false,_))        -> (true, 0)
        | ((false,_),(true,false))    -> checkWordYInc st word
        | ((_,true),(true,false))     -> checkWordYInc st word
        
-       // Error here?
-       | ((true,false),(true,false)) -> let first = collectWordYInc st word
-                                        let second = collectWordYDec st word
+       | ((true,false),(true,false)) -> let first = collectWordYDec st word
+                                        let second = collectWordYInc st word
                                         (wordExists st ((fst first).[0..(fst first).Length-2] @ (fst second)), (snd first) + (snd second))
        
        | ((true,false),(false,_))    -> checkWordYDec st word
        | ((true,false),(_,_))        -> checkWordYDec st word
        | (_,(true,_))                -> (true, 0)
+       | ((_,true),(_,true))         -> (true, 0)
+       | ((false,_),(false,_))       -> (false, 0)  
+       | ((_,true),(false,_))        -> (true, 0)
        
     let checkHorizontal (st : State) (c : coord) (word : List<coord*(char*int)>) =
-       match horizontalChecker st c with
-       | ((_,true),(_,true))         -> (true, 0)
-       | ((false,_),(_,_))           -> (false, 0) 
-       | ((_,true),(false,_))        -> (true, 0) 
+       match horizontalChecker st c with   
        | ((_,true),(true,false))     -> checkWordXInc st word
-
-       | ((true,false),(true,false)) -> let first = collectWordXInc st word
-                                        let second = collectWordXDec st word
+       | ((true,false),(_,true))     -> checkWordXDec st word
+       | ((true,false),(true,false)) -> let first = collectWordXDec st word
+                                        let second = collectWordXInc st word
                                         (wordExists st ((fst first).[0..(fst first).Length-2] @ (fst second)), (snd first) + (snd second))
 
        | ((true,false),(false,_))    -> checkWordXDec st word
-       | ((true,false),(_,_))        -> checkWordXDec st word
+       | ((_,true),(_,true))         -> (true, 0)
+       | ((false,_),(_,_))           -> (false, 0) 
+       | ((_,true),(false,_))        -> (true, 0) 
                                         
     // Move to util
-    let calcPoint (l : List<coord*(uint32*(char*int))>) = List.fold (fun acc (_, (_, (_,x))) -> acc + x) 0 l
+    let calcPoint (l : List<coord*(char*int)>) = List.fold (fun acc (_,(_,x)) -> acc + x) 0 l
 
     let check1 collector coordAdjuster concat state coord word =
         let w = collector state word 
@@ -95,9 +94,6 @@ module internal MoveGenerator =
     let checkYDec = checker checkHorizontal check1YDec
 
 
-    // Match checkHorizontal with -> include points
-    // Check horizontal on vertical and vice verce - Start from -/+1 and collect words
-    // Look ahead does not work
     // Use dictionary step - search does not stop when word does not exist
     let findValidWords coordAdjuster checker concat concat2 (st : State) coord startingPoint =
         let rec go hand word existing c words =
@@ -109,7 +105,7 @@ module internal MoveGenerator =
                                | (false, _) -> acc
                                | (true, p)  -> if wordExists st newExisting
                                                then Map.fold (fun acc key value -> 
-                                                    Map.add key value acc) (go (removeFirst (fun m -> m = ele) hand) newWord newExisting (coordAdjuster c) (Map.add ((calcPoint newWord) + p) newWord words)) acc 
+                                                    Map.add key value acc) (go (removeFirst (fun m -> m = ele) hand) newWord newExisting (coordAdjuster c) (Map.add ((calcPoint newExisting) + p) newWord words)) acc 
                                                else Map.fold (fun acc key value -> 
                                                     Map.add key value acc) (go (removeFirst (fun m -> m = ele) hand) newWord newExisting (coordAdjuster c) words) acc
                                           
@@ -134,43 +130,50 @@ module internal MoveGenerator =
         firstF state (firstAdjuster (fst char)) ([char], 0)
         |> fun x -> Some (Map.fold (fun acc key value ->
                           Map.add key value acc) x (secondF state (secondAdjuster (fst char)) ([char], 0)))
+
+
+
+    let apply3 firstF secondF firstAdjuster secondAdjuster state char (existing : List<coord * (char * int)> * int) =
+        firstF state (firstAdjuster (fst char) (fst existing).Length)  existing
+        |> fun x -> Some (Map.fold (fun acc key value ->
+                          Map.add key value acc) x (secondF state (secondAdjuster (fst char))  existing))
                   
     // Include point from all words -> include points from squares 
     // Try with first char in middle of word   
     // Wildcard? 
     // Place words vertical on top of horizontal & vice verca
-    // INCLUDE POINTS FROM EXISTING WORD
-    // FIND ERRORS
     // TRY MULTIPLAYER
+    // INCLUDE COLLECT IN APPLY
+    // DONT INCLUDE FIRST IN COLLECT
     let tryHorizontal (st : State) (first : coord*(char*int)) =
        match horizontalChecker st (fst first) with
        | ((false,_), (false,_)) -> None
        | ((_,false), (_,false)) -> None
        | ((_,true), (_,true))   -> apply2 findValidWordsXInc findValidWordsXDec incrementX decrementX st first
        
-       | ((_,true), (_,_))      -> let existing = collectWordXInc st [first]
-                                   apply findValidWordsXDec findValidWordsXInc decrementX incrementXTimes st first existing                 
+       | ((_,true), (_,_))      -> collectWordXInc st [first] |> apply findValidWordsXDec findValidWordsXInc decrementX incrementXTimes st first              
                                                             
-       | ((_,_), (_,true))      -> let existing = collectWordXDec st [first]
-                                   apply findValidWordsXInc findValidWordsXDec incrementX decrementXTimes st first existing
+       | ((_,_), (_,true))      -> collectWordXDec st [first] |> apply findValidWordsXInc findValidWordsXDec incrementX decrementXTimes st first
+
              
+    // Problems with looking hortizontal on vertical inc
     let tryVertical (st : State) (first : coord*(char*int)) =
        match verticalChecker st (fst first) with
        | ((false,_), (false,_)) -> None
        | ((_,false), (_,false)) -> None                           
        | ((_,true), (_,true))   -> apply2 findValidWordsYInc findValidWordsYDec incrementY decrementY st first
                                     
-       | ((_,true), (_,_))      -> let existing = collectWordYInc st [first]
-                                   apply findValidWordsYDec findValidWordsYInc decrementY incrementYTimes st first existing
-
-       | ((_,_), (_,true))      -> let existing = collectWordYInc st [first]
-                                   apply findValidWordsYDec findValidWordsYInc decrementY incrementYTimes st first existing
-
+       | ((_,true), (_,_))      -> collectWordYInc st [first] |> apply findValidWordsYDec findValidWordsYInc decrementY incrementYTimes st first
+       | ((_,_), (_,true))      -> collectWordYDec st [first] |> apply3 findValidWordsYDec findValidWordsYInc decrementYTimes incrementY st first
+    
+    
     let collectWords state =
         state.played |> Map.toList |> List.map (fun char -> tryHorizontal state char) 
                   |> fun x -> (List.map (fun char -> tryVertical state char) (Map.toList state.played)) @ x
 
     let validMove state word = List.forall (fun x -> x <> word) state.failedPlays
+    
+    // Look into why this is needed
     let validSquares state word = List.forall (fun x -> match Map.tryFind (fst x) state.played with
                                                         | Some _ -> false
                                                         | None   -> true 
@@ -178,7 +181,7 @@ module internal MoveGenerator =
                                     
     let extractResult state words =
         words |> List.fold (fun acc value -> Map.fold (fun a k v -> Map.add k v a) acc value) Map.empty
-              |> Map.toList |> List.filter (fun (_, x) -> validMove state x) 
+              |> Map.toList |> List.filter (fun (_, x) -> validMove state x && validSquares state x) 
               |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList state.hand) else SMPlay (snd (Seq.maxBy fst x))
 
     let findMove state = 
