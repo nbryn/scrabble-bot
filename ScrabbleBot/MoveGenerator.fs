@@ -129,14 +129,27 @@ module internal MoveGenerator =
         |> fun x -> Some (Map.fold (fun acc key value ->
                           Map.add key value acc) x (secondF state (secondAdjuster (fst char)) ([char], 0)))
 
-    let apply3 collectOpposite collector firstF secondF fAdjuster sAdjuster state char xt =
-        collectOpposite state char 
+    let apply3 collectOpposite co collector firstF secondF fAdjuster sAdjuster state char xt =
+        collectOpposite co state char 
         |> fun t ->
         let (existing : List<coord * (char * int)> * int) = collector state [char]
         firstF state (if xt then fAdjuster (fst char) else sAdjuster (fst existing).Length (fst char)) existing
         |> fun x -> Map.fold (fun acc key value ->
                     Map.add key value acc) x (secondF state (if xt then sAdjuster (fst existing).Length (fst char) else fAdjuster (fst char)) existing)
         |> fun h -> h :: t            
+
+
+    let collectOpposite cAdjuster concat index (oppositeF : State -> coord*(char*int) -> option<Map<int,list<(coord) * (uint32 * (char * int))>>>) (st : State) (first : coord*(char*int)) : List<option<Map<int,list<(coord) * (uint32 * (char * int))>>>> =
+       MultiSet.toList st.hand |> List.fold (fun acc ele -> 
+                                            [concat [(cAdjuster (fst first), Map.find ele st.tiles)] [first]] @ acc) []
+                               |> List.filter (fun x -> wordExists st x)
+                               |> fun t -> if List.isEmpty t then [] else List.map (fun (x : list<coord * (char * int)>) -> oppositeF st (x.[index])) t                                  
+
+       
+    let collectOppositeXInc = collectOpposite incrementX appender 1
+    let collectOppositeXDec = collectOpposite decrementX prepender 0  
+    let collectOppositeYInc = collectOpposite incrementY appender 1
+    let collectOppositeYDec = collectOpposite decrementY prepender 0
 
     // Include point from all words -> include points from squares 
     // Try with first char in middle of word   
@@ -145,19 +158,18 @@ module internal MoveGenerator =
     // TRY MULTIPLAYER
     // INCLUDE COLLECT IN APPLY
     // DONT INCLUDE FIRST IN COLLECT
-    let tryHorizontal (st : State) (first : coord*(char*int)) =
+    let rec tryHorizontal (st : State) (first : coord*(char*int)) =
        match horizontalChecker st (fst first) with
        | ((false,_), (false,_)) -> None
        | ((_,false), (_,false)) -> None
        | ((_,true), (_,true))   -> apply2 findValidWordsXInc findValidWordsXDec incrementX decrementX st first
        
-       | ((_,true), (_,_))      -> apply collectWordXInc findValidWordsXDec findValidWordsXInc decrementX incrementXTimes st first true              
+       | ((_,true), (_,_))      -> //apply3 collectOppositeXDec tryVertical collectWordXInc findValidWordsXDec findValidWordsXInc decrementX incrementXTimes st first true 
+                                   apply collectWordXInc findValidWordsXDec findValidWordsXInc decrementX incrementXTimes st first true              
                                                             
        | ((_,_), (_,true))      -> apply collectWordXDec findValidWordsXInc findValidWordsXDec incrementX decrementXTimes st first true
 
-
-    // Problems with looking hortizontal on vertical inc
-    let tryVertical (st : State) (first : coord*(char*int)) =
+    and tryVertical (st : State) (first : coord*(char*int)) =
        match verticalChecker st (fst first) with
        | ((false,_), (false,_)) -> None
        | ((_,false), (_,false)) -> None                           
@@ -166,19 +178,6 @@ module internal MoveGenerator =
        | ((_,true), (_,_))      -> apply collectWordYInc findValidWordsYDec findValidWordsYInc decrementY incrementYTimes st first true
        | ((_,_), (_,true))      -> apply collectWordYDec findValidWordsYDec findValidWordsYInc incrementY decrementYTimes st first false
       
-
-    let collectOpposite (oppositeF : State -> coord*(char*int) -> option<Map<int,list<(coord) * (uint32 * (char * int))>>>) cAdjuster concat index (st : State) (first : coord*(char*int)) : List<option<Map<int,list<(coord) * (uint32 * (char * int))>>>> =
-       MultiSet.toList st.hand |> List.fold (fun acc ele -> 
-                                            [concat [(cAdjuster (fst first), Map.find ele st.tiles)] [first]] @ acc) []
-                               |> fun x -> if List.isEmpty x then List.empty
-                                           else List.map (fun (x : list<coord * (char * int)>) -> oppositeF st (x.[index])) x                                  
-
-       
-    let collectOppositeXInc = collectOpposite tryVertical incrementX appender 1
-    let collectOppositeXDec = collectOpposite tryVertical decrementX prepender 0  
-    let collectOppositeYInc = collectOpposite tryHorizontal incrementY appender 1
-    let collectOppositeYDec = collectOpposite tryHorizontal decrementY prepender 0
-
 
     let collectWords state =
         state.played |> Map.toList |> List.map (fun char -> tryHorizontal state char) 
