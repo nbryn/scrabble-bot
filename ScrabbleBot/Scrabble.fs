@@ -37,7 +37,7 @@ module RegEx =
 module State = 
     type state = {
         board         : Parser.board
-        dict          : ScrabbleUtil.Dictionary.Dict
+        dict          : Dictionary.Dict
         numPlayers    : uint32
         playerNumber  : uint32
         playerTurn    : uint32
