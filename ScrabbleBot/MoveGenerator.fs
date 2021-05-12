@@ -122,7 +122,7 @@ module internal MoveGenerator =
     let findValidWordsYInc = findValidWords incrementY checkYInc appender appender
     let findValidWordsYDec = findValidWords decrementY checkYDec prepender prepender
 
-    let apply stF stF2 collector1 collector2 collector3 firstF secondF fAdjuster sAdjuster state char xt  =
+    let apply stF stF2 collector2 collector3 firstF secondF fAdjuster sAdjuster collector1 state char xt  =
         let (existing : List<coord * (char * int)> * int) = collector1 state [char] (fst char)
         foldHelper2 stF stF2 collector2 collector3 state (fAdjuster (fst char))
         |> fun fm -> firstF state (if xt then fAdjuster (fst char) else sAdjuster (fst existing).Length (fst char)) existing |> foldHelper3 fm
@@ -135,8 +135,8 @@ module internal MoveGenerator =
         |> fun thirdM -> Some (foldHelper3 thirdM (foldHelper firstF secondF firstAdjuster secondAdjuster state char))
 
     
-    let applyH = apply findValidWordsYDec findValidWordsYInc collectWordXInc collectWordYInc collectWordYDec findValidWordsXDec findValidWordsXInc
-    let applyV = apply findValidWordsXDec findValidWordsXInc collectWordYInc collectWordXInc collectWordXDec findValidWordsYDec findValidWordsYInc
+    let applyH = apply findValidWordsYDec findValidWordsYInc collectWordYInc collectWordYDec findValidWordsXDec findValidWordsXInc
+    let applyV = apply findValidWordsXDec findValidWordsXInc collectWordXInc collectWordXDec findValidWordsYDec findValidWordsYInc
 
     let rec tryHorizontal (st : State) (first : coord*(char*int)) =
        match horizontalChecker st (fst first) with
@@ -144,8 +144,8 @@ module internal MoveGenerator =
        | ((_,false), (_,false)) -> None
        | ((_,true), (_,true))   -> apply2 findValidWordsYDec findValidWordsYInc collectWordYInc collectWordYDec findValidWordsXInc findValidWordsXDec incrementX decrementX st first
        
-       | ((_,true), (_,_))      -> applyH decrementX incrementXTimes st first true                                                                        
-       | ((_,_), (_,true))      -> applyH incrementX decrementXTimes st first true
+       | ((_,true), (_,_))      -> applyH decrementX incrementXTimes collectWordXInc st first true                                                                        
+       | ((_,_), (_,true))      -> applyH incrementX decrementXTimes collectWordXDec st first true
 
     and tryVertical (st : State) (first : coord*(char*int)) =
        match verticalChecker st (fst first) with
@@ -153,8 +153,8 @@ module internal MoveGenerator =
        | ((_,false), (_,false)) -> None                           
        | ((_,true), (_,true))   -> apply2 findValidWordsXDec findValidWordsXInc collectWordXInc collectWordXDec findValidWordsYInc findValidWordsYDec incrementY decrementY st first
                                     
-       | ((_,true), (_,_))      -> applyV decrementY incrementYTimes st first true
-       | ((_,_), (_,true))      -> applyV incrementY decrementYTimes st first false
+       | ((_,true), (_,_))      -> applyV decrementY incrementYTimes collectWordYInc st first true
+       | ((_,_), (_,true))      -> applyV incrementY decrementYTimes collectWordYDec  st first false
       
 
     let collectWords state =
@@ -167,7 +167,11 @@ module internal MoveGenerator =
                                                         | Some _ -> false
                                                         | None   -> true 
                                                ) word
-                                    
+
+    // Only change when playing alone else pass  
+    // Move functions to util
+    // Try with word in middle
+    // Calc point from squares                              
     let extractResult state words =
         words |> List.fold (fun acc value -> Map.fold (fun a k v -> Map.add k v a) acc value) Map.empty
               |> Map.toList |> List.filter (fun (_, x) -> validMove state x && validSquares state x) 
