@@ -2,6 +2,8 @@ namespace nbryn
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
 open BoardUtil
+open Eval
+open Parser
 open Types
 open Utility
 module internal MoveGenerator =
@@ -56,8 +58,21 @@ module internal MoveGenerator =
        | ((_,true),(_,true))         -> (true, 0)
        | ((false,_),(_,_))           -> (false, 0) 
        | ((_,true),(false,_))        -> (true, 0) 
-                                        
-    let calcPoint (l : List<coord*(char*int)>) = List.fold (fun acc (_,(_,x)) -> acc + x) 0 l
+
+    // Cleanup                                    
+    let calcPoints (st : State) (word : List<coord*(char*int)>) =
+        let alreadyPlaced = List.filter (fun x -> not (squareFree st (fst x))) word
+        let news = List.filter (fun x -> squareFree st (fst x)) word
+        let l = List.map (fun x -> st.board.squares (fst x) |> fun t -> t.Value) news
+        let w = List.map (fun x -> snd x) word 
+        l |> List.mapi (fun i square -> Map.toList square |> fun x -> List.map (fun (priority, stm) -> (priority, stm w i)) x)
+             |> List.fold (fun list n -> List.append n list) []
+             |> List.sortBy (fst)
+             |> List.map (snd)
+             |> List.fold (( >> )) (id)
+             |> fun x -> x 0
+             |> fun t -> List.fold (fun acc ele -> acc + (snd (snd ele))) t alreadyPlaced
+             |> fun m -> if news.Length = 7 then m + 50 else m
 
     let check1 collector coordAdjuster concat state coord word =
         let w = collector state word coord  
@@ -98,7 +113,7 @@ module internal MoveGenerator =
                                | (false, _) -> acc
                                | (true, p)  -> if wordExists st newExisting
                                                then Map.fold (fun acc key value -> 
-                                                    Map.add key value acc) (go (removeFirst (fun m -> m = ele) hand) newWord newExisting (coordAdjuster c) (Map.add ((calcPoint newExisting) + p) newWord words)) acc 
+                                                    Map.add key value acc) (go (removeFirst (fun m -> m = ele) hand) newWord newExisting (coordAdjuster c) (Map.add ((calcPoints st newExisting) + p) newWord words)) acc 
                                                else Map.fold (fun acc key value -> 
                                                     Map.add key value acc) (go (removeFirst (fun m -> m = ele) hand) newWord newExisting (coordAdjuster c) words) acc
                                           
@@ -168,10 +183,10 @@ module internal MoveGenerator =
                                                         | None   -> true 
                                                ) word
 
+    // Try with word in middle
     // Only change when playing alone else pass  
     // Move functions to util
-    // Try with word in middle
-    // Calc point from squares                              
+    // Check calc points is correct                             
     let extractResult state words =
         words |> List.fold (fun acc value -> Map.fold (fun a k v -> Map.add k v a) acc value) Map.empty
               |> Map.toList |> List.filter (fun (_, x) -> validMove state x && validSquares state x) 
