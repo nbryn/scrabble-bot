@@ -53,10 +53,7 @@ module State =
     let dict st          = st.dict
     let playerNumber st  = st.playerNumber
     let hand st          = st.hand
-
 module Scrabble =
-    open System.Threading
-
     let changeTurn (st : State.state) = if st.playerTurn = st.numPlayers then uint32 1 else (st.playerTurn + uint32 1)
 
     let playGame cstream pieces (st : State.state) =
@@ -68,17 +65,15 @@ module Scrabble =
                    
                     move <- findMove (convertState st.board st.dict st.hand st.played st.tiles placeCenter st.failedPlays)
                     debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move)
-                   
+
                     match move with
                     | SMPlay move   -> send cstream (SMPlay move)
                     | SMChange move -> send cstream (SMChange move)
 
             let msg = recv cstream
-            //debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.playerNumber st) move)
 
             match msg with
             | RCM (CMPlaySuccess(ms, points, newPieces)) ->
-                (* Successful play by you. Update your state (remove old tiles, add the new ones, change turn, etc) *)
                 let oldTiles = List.map (fun (_, (y, _)) -> (y, uint32 1)) ms
 
                 let lastPlayed = List.map (fun (x, (y, _)) -> (x, (y, (Map.find y pieces)))) ms

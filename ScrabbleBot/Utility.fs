@@ -2,7 +2,7 @@ namespace nbryn
 
 open ScrabbleUtil
 module internal Utility =
-  
+
     let memoize fn =
       let cache = new System.Collections.Generic.Dictionary<_,_>()
       (fun s c ->

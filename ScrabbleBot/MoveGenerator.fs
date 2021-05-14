@@ -44,9 +44,8 @@ module internal MoveGenerator =
        
        | ((_,_),(true,false))        -> checkWordYInc st word (fst word.[0])    
        | ((true,false),(_,_))        -> checkWordYDec st word (fst word.[0])
-       | (_,_),(true,_)              -> (true, 0)
-       | ((false,_),(false,_))       -> (false, 0)  
-       | ((_,true),(false,_))        -> (true, 0)
+       | ((_,_),(_,_))               -> (true, 0)
+
        
     let checkHorizontal (st : State) (c : coord) (word : List<coord*(char*int)>) =
        match squareExistsAndFree2 st c with
@@ -57,10 +56,10 @@ module internal MoveGenerator =
                                         let second = collectWordXInc st word (fst word.[0])
                                         (wordExists st ((fst first).[0..(fst first).Length-2] @ (fst second)), (snd first) + (snd second))
        
-       | ((_,true),(true,false))     -> checkWordXInc st word (fst word.[0])
+       | ((_,_),(true,false))        -> checkWordXInc st word (fst word.[0])
        | ((true,false),(_,_))        -> checkWordXDec st word (fst word.[0])
-       | ((_,true),(_,_))            -> (true, 0)
-       | ((false,_),(_,_))           -> (false, 0) 
+       | ((_,_),(_,_))               -> (true, 0)
+ 
 
     let checkSameDirection collector coordAdjuster concat concat2 state coord char existing word hand currentTile =
         let w : List<coord * (char * int)> * int = collector state [] coord
@@ -90,7 +89,6 @@ module internal MoveGenerator =
     let checkYDec = checker checkHorizontal check1YDec
 
     // Use dictionary.step to prevent going on for to long
-    // Use parallel?
     let findValidWords coordAdjuster checker (st : State) coord startingPoint =
         let rec go hand word existing c words =
             hand |> List.fold (fun acc ele -> 
@@ -110,8 +108,6 @@ module internal MoveGenerator =
     let findValidWordsYInc = findValidWords incrementY checkYInc 
     let findValidWordsYDec = findValidWords decrementY checkYDec
 
-
-    // Need to increment coord when calling first findValidWords in foldHelper2
     let apply stF stF2 collector2 collector3 firstF secondF fAdjuster sAdjuster collector1 state char xt  =
         let (existing : List<coord * (char * int)> * int) = collector1 state [char] (fst char)
         foldHelper2 stF stF2 collector2 collector3 state (fAdjuster (fst char))
@@ -147,7 +143,6 @@ module internal MoveGenerator =
        | ((_,_), (_,true))      -> applyV incrementY decrementYTimes collectWordYDec  st first false
       
 
-    // Try vertical and horizontal in parralel
     let collectWords state =
         state.played |> Map.toList |> List.map (fun char -> tryHorizontal state char) 
                   |> fun x -> (List.map (fun char -> tryVertical state char) (Map.toList state.played)) @ x
@@ -158,15 +153,14 @@ module internal MoveGenerator =
                                                         | Some _ -> false
                                                         | None   -> true 
                                                ) word
-
-    // Check calc points is correct   
     // Only change when playing alone else pass  
-    // Try with word in middle
+    // Try with char in middle
     // Rename functions                      
     let extractResult state words =
         words |> List.fold (fun acc value -> Map.fold (fun a k v -> Map.add k v a) acc value) Map.empty
               |> Map.toList |> List.filter (fun (_, x) -> validMove state x)
               |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList state.hand) else SMPlay (snd (Seq.maxBy fst x))
+
 
     let findMove state = 
         if state.placeCenter then findValidWordsXInc state (0, 0) ([],0) 
