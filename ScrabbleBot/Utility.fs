@@ -25,7 +25,16 @@ module internal Utility =
     let appender word append = word@append
     let prepender word prepend = prepend@word
 
+    let foldHelper f1 f2 firstAdjuster secondAdjuster state char =
+        Map.fold (fun acc key value ->
+        Map.add key value acc) (f1 state (firstAdjuster (fst char)) ([char], 0)) (f2 state (secondAdjuster (fst char)) ([char], 0))
 
+    let foldHelper2 f1 f2 collector1 collector2 state coord =
+        Map.fold (fun acc key value ->
+        Map.add key value acc) (f1 state coord (collector1 state [] coord)) (f2 state coord (collector2 state [] coord))
+
+    let foldHelper3 map1 map2  =
+        Map.fold (fun acc key value -> Map.add key value acc) map1 map2
 module internal BoardUtil =
     open Utility
     open Types
@@ -39,17 +48,6 @@ module internal BoardUtil =
     let decrementX c : coord  = decrementXTimes 1 c
     let incrementY c : coord  = incrementYTimes 1 c
     let decrementY c : coord  = decrementYTimes 1 c
-
-
-    let incOrDec amount c adjuster x =
-        match x with
-        | true -> adjuster amount c
-        | _   -> decrementXTimes amount c
-    
-    let incOrDecY amount c inc =
-        match inc with
-        | true -> incrementYTimes amount c
-        | _   -> decrementYTimes amount c
 
     let squareExist (st : State) (coord : coord) =
         match st.board.squares coord with
@@ -87,3 +85,15 @@ module internal BoardUtil =
     let wordExists2 (st : State) (list : List<coord*(uint32*(char*int))>) =
         let word = List.map (fun (_,(_,(y, _))) -> y) list |> List.toArray |> System.String
         Dictionary.lookup word st.dict
+
+    let calcPoints (st : State) (word : List<coord*(char*int)>) =
+        List.filter (fun x -> squareFree st (fst x)) word
+         |> List.map (fun x -> st.board.squares (fst x) |> fun t -> t.Value) 
+         |> List.mapi (fun i square -> Map.toList square |> fun x -> List.map (fun (priority, stm) -> (priority, stm (List.map (fun x -> snd x) word) i)) x)
+         |> List.fold (fun list n -> List.append n list) []
+         |> List.sortBy (fst)
+         |> List.map (snd)
+         |> List.fold (( >> )) (id)
+         |> fun x -> x 0
+         |> fun t -> List.fold (fun acc ele -> acc + (snd (snd ele))) t (List.filter (fun x -> not (squareFree st (fst x))) word)
+         |> fun m -> if (List.filter (fun x -> squareFree st (fst x)) word).Length = 7 then m + 50 else m

@@ -2,8 +2,6 @@ namespace nbryn
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
 open BoardUtil
-open Eval
-open Parser
 open Types
 open Utility
 module internal MoveGenerator =
@@ -59,22 +57,8 @@ module internal MoveGenerator =
        | ((false,_),(_,_))           -> (false, 0) 
        | ((_,true),(false,_))        -> (true, 0) 
 
-    // Cleanup                                    
-    let calcPoints (st : State) (word : List<coord*(char*int)>) =
-        let alreadyPlaced = List.filter (fun x -> not (squareFree st (fst x))) word
-        let news = List.filter (fun x -> squareFree st (fst x)) word
-        let l = List.map (fun x -> st.board.squares (fst x) |> fun t -> t.Value) news
-        let w = List.map (fun x -> snd x) word 
-        l |> List.mapi (fun i square -> Map.toList square |> fun x -> List.map (fun (priority, stm) -> (priority, stm w i)) x)
-             |> List.fold (fun list n -> List.append n list) []
-             |> List.sortBy (fst)
-             |> List.map (snd)
-             |> List.fold (( >> )) (id)
-             |> fun x -> x 0
-             |> fun t -> List.fold (fun acc ele -> acc + (snd (snd ele))) t alreadyPlaced
-             |> fun m -> if news.Length = 7 then m + 50 else m
-
-    let check1 collector coordAdjuster concat state coord word =
+    // Pass existing as arg -> return newExisting from this? Then possible to continue after                            
+    let checkSameDirection collector coordAdjuster concat state coord word =
         let w = collector state word coord  
         match squareExistsAndFree2 state coord with
         | (true,t)  -> match squareExistsAndFree2 state (coordAdjuster coord) with
@@ -83,11 +67,19 @@ module internal MoveGenerator =
                        | (true,false) -> if t then wordExists state (concat (fst w) word)                               // Error here?
                                               else wordExists state (concat (fst (collector state (concat (fst w) word) (fst (concat (fst w) word).[0]))) word)
         | (false,_) -> false
+
+    let checkSameDirection1 collector coordAdjuster concat state coord word =
+        let w = collector state word coord  
+        match squareExistsAndFree2 state coord with
+        | (true,false) -> (true, concat word w)
+                           
+        | (true,true)  -> (true, []) 
+        | (false,_)    -> (false, [])
                                   
-    let check1XInc = check1 collectWordXInc incrementX appender
-    let check1XDec = check1 collectWordXDec decrementX prepender
-    let check1YInc = check1 collectWordYInc incrementY appender
-    let check1YDec = check1 collectWordYDec decrementY prepender
+    let check1XInc = checkSameDirection collectWordXInc incrementX appender
+    let check1XDec = checkSameDirection collectWordXDec decrementX prepender
+    let check1YInc = checkSameDirection collectWordYInc incrementY appender
+    let check1YDec = checkSameDirection collectWordYDec decrementY prepender
     
     let checker checkAdj checkS state coord word word2 = 
         match checkAdj state coord word with
@@ -103,6 +95,7 @@ module internal MoveGenerator =
     let checkYInc = checker checkHorizontal check1YInc
     let checkYDec = checker checkHorizontal check1YDec
 
+    // In checker after collecting word return word and increment coord -> try placing after
     let findValidWords coordAdjuster checker concat concat2 (st : State) coord startingPoint =
         let rec go hand word existing c words =
             hand |> List.fold (fun acc ele -> 
@@ -121,22 +114,12 @@ module internal MoveGenerator =
 
         go (MultiSet.toList st.hand) [] (fst startingPoint) coord Map.empty
 
-    let foldHelper f1 f2 firstAdjuster secondAdjuster state char =
-        Map.fold (fun acc key value ->
-        Map.add key value acc) (f1 state (firstAdjuster (fst char)) ([char], 0)) (f2 state (secondAdjuster (fst char)) ([char], 0))
-
-    let foldHelper2 f1 f2 collector1 collector2 state coord =
-        Map.fold (fun acc key value ->
-        Map.add key value acc) (f1 state coord (collector1 state [] coord)) (f2 state coord (collector2 state [] coord))
-
-    let foldHelper3 map1 map2  =
-        Map.fold (fun acc key value -> Map.add key value acc) map1 map2
-
     let findValidWordsXInc = findValidWords incrementX checkXInc appender appender
     let findValidWordsXDec = findValidWords decrementX checkXDec prepender prepender
     let findValidWordsYInc = findValidWords incrementY checkYInc appender appender
     let findValidWordsYDec = findValidWords decrementY checkYDec prepender prepender
 
+    // Need to increment coord when calling first findValidWords in foldHelper2
     let apply stF stF2 collector2 collector3 firstF secondF fAdjuster sAdjuster collector1 state char xt  =
         let (existing : List<coord * (char * int)> * int) = collector1 state [char] (fst char)
         foldHelper2 stF stF2 collector2 collector3 state (fAdjuster (fst char))
@@ -183,10 +166,10 @@ module internal MoveGenerator =
                                                         | None   -> true 
                                                ) word
 
-    // Try with word in middle
+    // Check calc points is correct   
     // Only change when playing alone else pass  
-    // Move functions to util
-    // Check calc points is correct                             
+    // Try with word in middle
+    // Rename functions                      
     let extractResult state words =
         words |> List.fold (fun acc value -> Map.fold (fun a k v -> Map.add k v a) acc value) Map.empty
               |> Map.toList |> List.filter (fun (_, x) -> validMove state x && validSquares state x) 
