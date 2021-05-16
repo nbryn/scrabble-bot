@@ -88,7 +88,6 @@ module internal MoveGenerator =
     let checkYInc = checker checkHorizontal check1YInc
     let checkYDec = checker checkHorizontal check1YDec
 
-    // Use dictionary.step to prevent going on for to long
     let findValidWords coordAdjuster checker (st : State) coord startingPoint =
         let rec go hand word existing c words =
             hand |> List.fold (fun acc ele -> 
@@ -148,20 +147,9 @@ module internal MoveGenerator =
                   |> fun x -> (List.map (fun char -> tryVertical state char) (Map.toList state.played)) @ x
 
 
-    let collectWords1 state =
-        state.played |> Map.toList |> fun x -> let tasks = [async {return List.map (fun char -> tryHorizontal state char) x}; async {return List.map (fun char -> tryVertical state char) x}]
-                                               Async.RunSynchronously(Async.Parallel tasks)
-                  
-
     let validMove state word = List.forall (fun x -> x <> word) state.failedPlays
     
-    let validSquares state word = List.forall (fun x -> match Map.tryFind (fst x) state.played with
-                                                        | Some _ -> false
-                                                        | None   -> true 
-                                               ) word
-    // Only change when playing alone else pass  
-    // Try with char in middle
-    // Rename functions                      
+
     let extractResult state words =
         words |> List.fold (fun acc value -> Map.fold (fun a k v -> Map.add k v a) acc value) Map.empty
               |> Map.toList |> List.filter (fun (_, x) -> validMove state x)

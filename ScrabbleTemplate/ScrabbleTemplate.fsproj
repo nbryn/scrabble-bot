@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <PackageReference Include="Oxyphenbutazone" Version="1.0.6" />
+    <PackageReference Include="BiggerBrains" Version="2.2.0" />
     <PackageReference Include="ScrabbleServer" Version="1.0.8" />
   </ItemGroup>
 
