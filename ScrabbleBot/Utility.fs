@@ -26,13 +26,8 @@ module internal Utility =
     let appender word append = word@append
     let prepender word prepend = prepend@word
 
-    let foldHelper f1 f2 firstAdjuster secondAdjuster state char =
-        Map.fold (fun acc key value ->
-        Map.add key value acc) (f1 state (firstAdjuster (fst char)) ([char], 0)) (f2 state (secondAdjuster (fst char)) ([char], 0))
 
-    let foldHelper2 f1 f2 collector1 collector2 state coord =
-        Map.fold (fun acc key value ->
-        Map.add key value acc) (f1 state coord (collector1 state [] coord)) (f2 state coord (collector2 state [] coord))
+    
 
     let foldHelper3 map1 map2  =
         Map.fold (fun acc key value -> Map.add key value acc) map1 map2
@@ -108,4 +103,4 @@ module internal BoardUtil =
              |> List.map (snd)
              |> List.fold (( >> )) (id)
              |> fun x -> x 0
-             |> fun m -> if (List.filter (fun x -> squareFree st (fst x)) word).Length = 7 then m + 50 else m
+             |> fun m -> if word.Length = 7 then m + 50 else m
