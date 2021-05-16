@@ -3,6 +3,10 @@ namespace nbryn
 open ScrabbleUtil
 module internal Utility =
 
+    (* let memoize (f: 'a -> 'b) =
+        let cache = System.Collections.Concurrent.ConcurrentDictionary<'a, 'b>()
+        fun x -> cache.GetOrAdd(x, f) *)
+
     let memoize fn =
       let cache = new System.Collections.Generic.Dictionary<_,_>()
       (fun s c ->

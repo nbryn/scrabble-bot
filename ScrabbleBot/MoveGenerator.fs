@@ -147,6 +147,12 @@ module internal MoveGenerator =
         state.played |> Map.toList |> List.map (fun char -> tryHorizontal state char) 
                   |> fun x -> (List.map (fun char -> tryVertical state char) (Map.toList state.played)) @ x
 
+
+    let collectWords1 state =
+        state.played |> Map.toList |> fun x -> let tasks = [async {return List.map (fun char -> tryHorizontal state char) x}; async {return List.map (fun char -> tryVertical state char) x}]
+                                               Async.RunSynchronously(Async.Parallel tasks)
+                  
+
     let validMove state word = List.forall (fun x -> x <> word) state.failedPlays
     
     let validSquares state word = List.forall (fun x -> match Map.tryFind (fst x) state.played with
@@ -163,7 +169,7 @@ module internal MoveGenerator =
 
 
     let findMove state = 
-        if state.placeCenter then findValidWordsXInc state (0, 0) ([],0) 
+        if state.placeCenter then findValidWordsXDec state (0, 0) ([],0) 
                                |> Map.toList 
                                |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList state.hand) else SMPlay (snd (Seq.maxBy fst x))
         else collectWords state |> removeEmpty |> fun x -> if List.isEmpty x then SMChange (MultiSet.toList state.hand) else extractResult state x
