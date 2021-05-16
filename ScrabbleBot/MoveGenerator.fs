@@ -69,11 +69,38 @@ module internal MoveGenerator =
         | (true,true)  -> (true, coord, (removeFirst (fun m -> m = currentTile) hand), concat existing [coord, char], concat2 word [(coord, (currentTile, char))]) 
         | (false,_)    -> (false, coord, hand, (concat existing (fst w)), concat2 word [(coord, (currentTile, char))])
 
+ 
+    let getChar (s : (coord*(char*int))) = fst ((snd s))
+
+    let rec stepDictWordExists (word : List<coord*(char*int)>) (dict : Dictionary.Dict) =
+            if word.Length = 1 then snd (Dictionary.step (getChar word.[0]) dict).Value
+            else stepDictWordExists (word.[1..word.Length-1]) (snd ((Dictionary.step (getChar word.[0]) dict).Value))
+ 
+    let getChar2 (s : (coord*(uint32*(char*int)))) = fst (snd((snd s)))
+
+    let rec stepDictWordExists2 (word : List<coord*(uint32*(char*int))>) (dict : Dictionary.Dict) =
+            if List.isEmpty word then dict
+            else stepDictWordExists2 (word.[1..word.Length-1]) (snd ((Dictionary.step (getChar2 word.[0]) dict).Value))
+
+    let simpleCalcPoint (word : List<coord * (char * int)>) = List.fold (fun acc ele -> (snd (snd ele)) + acc) 0 word
+ 
+    let checkSameDirection2 collector coordAdjuster concat2 state coord char word hand currentTile dict =
+        let w : List<coord * (char * int)> * int = collector state [] coord
+        match squareExistsAndFree2 state coord with
+        | (true,false) -> (true, (coordAdjuster ((fst w).Length-1) coord), hand, (stepDictWordExists (fst w) dict), word, simpleCalcPoint (fst w))
+                           
+        | (true,true)  -> (true, coord, (removeFirst (fun m -> m = currentTile) hand), (stepDictWordExists [coord, char] dict), concat2 word [(coord, (currentTile, char))], simpleCalcPoint (fst w)) 
+        | (false,_)    -> (false, coord, hand, (stepDictWordExists (fst w) dict), concat2 word [(coord, (currentTile, char))], simpleCalcPoint (fst w))
 
     let check1XInc = checkSameDirection collectWordXInc2 incrementXTimes appender appender
     let check1XDec = checkSameDirection collectWordXDec2 decrementXTimes prepender prepender
     let check1YInc = checkSameDirection collectWordYInc2 incrementYTimes appender appender
     let check1YDec = checkSameDirection collectWordYDec2 decrementYTimes prepender prepender
+
+    let check1XInc2 = checkSameDirection2 collectWordXInc2 incrementXTimes appender
+    let check1XDec2 = checkSameDirection2 collectWordXDec2 decrementXTimes prepender
+    let check1YInc2 = checkSameDirection2 collectWordYInc2 incrementYTimes appender
+    let check1YDec2 = checkSameDirection2 collectWordYDec2 decrementYTimes prepender
                                   
     let checker checkAdj checkS state coord char existing word hand currentTile =  
         match checkAdj state coord [coord, char] with
@@ -83,10 +110,23 @@ module internal MoveGenerator =
         
         | (false, _) -> (false, 0, (0,0), [], [], [])
 
+    let checker2 checkAdj checkS state coord char word hand currentTile (dict : Dictionary.Dict) =  
+        match checkAdj state coord [coord, char] with
+        | (true, p1)  -> match checkS state coord char word hand currentTile dict with
+                         | (true,c,h,d,w1, p2)  -> (true, p1 + p2, c, h, d, w1)
+                         | (false,c,h,d,w1, p2) -> (false, p2, c, h, d, w1)
+        
+        | (false, _) -> (false, 0, (0,0), [], dict, [])
+
     let checkXInc = checker checkVertical check1XInc
     let checkXDec = checker checkVertical check1XDec
     let checkYInc = checker checkHorizontal check1YInc
     let checkYDec = checker checkHorizontal check1YDec
+
+    let checkXInc2 = checker2 checkVertical check1XInc2
+    let checkXDec2 = checker2 checkVertical check1XDec2
+    let checkYInc2 = checker2 checkHorizontal check1YInc2
+    let checkYDec2 = checker2 checkHorizontal check1YDec2
 
     // Use dictionary.step to prevent going on for to long
     let findValidWords coordAdjuster checker (st : State) coord startingPoint =
@@ -103,17 +143,48 @@ module internal MoveGenerator =
 
         go (MultiSet.toList st.hand) [] (fst startingPoint) coord Map.empty
 
+    // Step in dict
+    let findValidWords2 coordAdjuster checker (st : State) coord dict =
+        let rec go hand word c words dictt =
+            hand |> List.fold (fun acc ele -> 
+                    match checker st c (Map.find ele st.tiles) word hand ele dictt with
+                    | (false,_,_,_,_,_)       -> acc
+                    | (true, p, c2, h, d2, w1) -> match squareExistsAndFree2 st (coordAdjuster c) with
+                                                  | (true,false) -> foldHelper3 (go h w1 (coordAdjuster c2) words dict) acc 
+                                                  | (_,_)        -> match Dictionary.step (fst (Map.find ele st.tiles)) d2 with
+                                                                    | Some (true, d)  -> foldHelper3 (go h w1 (coordAdjuster c2) (Map.add ((calcPoints2 st w1) + p) w1 words) d) acc 
+                                                                    | Some (false, d) -> foldHelper3 (go h w1 (coordAdjuster c2) words d) acc 
+                                                                    | None            -> acc
+                             ) words
+
+        go (MultiSet.toList st.hand) [] coord Map.empty dict
+
     let findValidWordsXInc = findValidWords incrementX checkXInc 
     let findValidWordsXDec = findValidWords decrementX checkXDec 
     let findValidWordsYInc = findValidWords incrementY checkYInc 
     let findValidWordsYDec = findValidWords decrementY checkYDec
 
-    let apply stF stF2 collector2 collector3 firstF secondF fAdjuster sAdjuster collector1 state char xt  =
-        let (existing : List<coord * (char * int)> * int) = collector1 state [char] (fst char)
+    let findValidWordsXInc2 = findValidWords2 incrementX checkXInc2 
+    let findValidWordsXDec2 = findValidWords2 decrementX checkXDec2 
+    let findValidWordsYInc2 = findValidWords2 incrementY checkYInc2 
+    let findValidWordsYDec2 = findValidWords2 decrementY checkYDec2
+
+    let apply stF stF2 collector2 collector3 firstF secondF fAdjuster sAdjuster collector1 (state : State) char xt  =
+        let existing : List<coord * (char * int)> * int = collector1 state [char] (fst char)
         foldHelper2 stF stF2 collector2 collector3 state (fAdjuster (fst char))
         |> fun fm -> firstF state (if xt then fAdjuster (fst char) else sAdjuster (fst existing).Length (fst char)) existing |> foldHelper3 fm
         |> fun sm -> Some (foldHelper3 sm (secondF state (if xt then sAdjuster (fst existing).Length (fst char) else fAdjuster (fst char)) existing))
  
+    let foldHelper6 f1 f2 collector1 collector2 (state : State) coord =
+        Map.fold (fun acc key value ->
+        Map.add key value acc) (f1 state coord state.dict) (f2 state coord state.dict)
+    
+    let apply5 stF stF2 collector2 collector3 firstF secondF fAdjuster sAdjuster collector1 (state : State) char xt  =
+        let existing : List<coord * (char * int)> * int = collector1 state [char] (fst char)
+        let newD = stepDictWordExists (fst existing) state.dict
+        foldHelper6 stF stF2 collector2 collector3 state (fAdjuster (fst char))
+        |> fun fm -> firstF state (if xt then fAdjuster (fst char) else sAdjuster (fst existing).Length (fst char)) existing |> foldHelper3 fm
+        |> fun sm -> Some (foldHelper3 sm (secondF state (if xt then sAdjuster (fst existing).Length (fst char) else fAdjuster (fst char)) newD))
 
     let apply2 stF stF2 collector1 collector2 firstF secondF firstAdjuster secondAdjuster state char =
         foldHelper2 stF stF2 collector1 collector2 state (firstAdjuster (fst char))
@@ -124,14 +195,17 @@ module internal MoveGenerator =
     let applyH = apply findValidWordsYDec findValidWordsYInc collectWordYInc collectWordYDec findValidWordsXDec findValidWordsXInc
     let applyV = apply findValidWordsXDec findValidWordsXInc collectWordXInc collectWordXDec findValidWordsYDec findValidWordsYInc
 
+    let applyH2 = apply5 findValidWordsYDec2 findValidWordsYInc2 collectWordYInc collectWordYDec findValidWordsXDec findValidWordsXInc2
+    let applyV2 = apply5 findValidWordsXDec2 findValidWordsXInc2 collectWordXInc collectWordXDec findValidWordsYDec findValidWordsYInc2
+
     let rec tryHorizontal (st : State) (first : coord*(char*int)) =
        match horizontalChecker st (fst first) with
        | ((false,_), (false,_)) -> None
        | ((_,false), (_,false)) -> None
        | ((_,true), (_,true))   -> apply2 findValidWordsYDec findValidWordsYInc collectWordYInc collectWordYDec findValidWordsXInc findValidWordsXDec incrementX decrementX st first
        
-       | ((_,true), (_,_))      -> applyH decrementX incrementXTimes collectWordXInc st first true                                                                        
-       | ((_,_), (_,true))      -> applyH incrementX decrementXTimes collectWordXDec st first true
+       | ((_,true), (_,_))      -> applyH2 decrementX incrementXTimes collectWordXInc st first true                                                                       
+       | ((_,_), (_,true))      -> applyH2 incrementX decrementXTimes collectWordXDec st first true
 
     and tryVertical (st : State) (first : coord*(char*int)) =
        match verticalChecker st (fst first) with
@@ -139,8 +213,8 @@ module internal MoveGenerator =
        | ((_,false), (_,false)) -> None                           
        | ((_,true), (_,true))   -> apply2 findValidWordsXDec findValidWordsXInc collectWordXInc collectWordXDec findValidWordsYInc findValidWordsYDec incrementY decrementY st first
                                     
-       | ((_,true), (_,_))      -> applyV decrementY incrementYTimes collectWordYInc st first true
-       | ((_,_), (_,true))      -> applyV incrementY decrementYTimes collectWordYDec  st first false
+       | ((_,true), (_,_))      -> applyV2 decrementY incrementYTimes collectWordYInc st first true
+       | ((_,_), (_,true))      -> applyV2 incrementY decrementYTimes collectWordYDec  st first false
       
 
     let collectWords state =

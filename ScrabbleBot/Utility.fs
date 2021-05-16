@@ -3,9 +3,6 @@ namespace nbryn
 open ScrabbleUtil
 module internal Utility =
 
-    (* let memoize (f: 'a -> 'b) =
-        let cache = System.Collections.Concurrent.ConcurrentDictionary<'a, 'b>()
-        fun x -> cache.GetOrAdd(x, f) *)
 
     let memoize fn =
       let cache = new System.Collections.Generic.Dictionary<_,_>()
@@ -101,3 +98,14 @@ module internal BoardUtil =
          |> fun x -> x 0
          |> fun t -> List.fold (fun acc ele -> acc + (snd (snd ele))) t (List.filter (fun x -> not (squareFree st (fst x))) word)
          |> fun m -> if (List.filter (fun x -> squareFree st (fst x)) word).Length = 7 then m + 50 else m
+
+
+    let calcPoints2 (st : State) (word : List<coord*(uint32*(char*int))>) =
+        word |> List.map (fun x -> st.board.squares (fst x) |> fun t -> t.Value) 
+             |> List.mapi (fun i square -> Map.toList square |> fun x -> List.map (fun (priority, stm) -> (priority, stm (List.map (fun x -> snd (snd x)) word) i)) x)
+             |> List.fold (fun list n -> List.append n list) []
+             |> List.sortBy (fst)
+             |> List.map (snd)
+             |> List.fold (( >> )) (id)
+             |> fun x -> x 0
+             |> fun m -> if (List.filter (fun x -> squareFree st (fst x)) word).Length = 7 then m + 50 else m
