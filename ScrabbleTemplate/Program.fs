@@ -46,8 +46,8 @@ let main argv =
     let seed       = None
     let port       = 13001
 
-//    let players    = [("nbryn", nbryn.Scrabble.startGame); ("BigBrainsBot", Bigg.Scrabble.startGame)]
-    let players    = [("nbryn", nbryn.Scrabble.startGame); ("OxyphenButazone", Oxyphenbutazone.Scrabble.startGame)]
+    let players    = [("nbryn", nbryn.Scrabble.startGame); ("BiggerBrainBot", BiggerBrainBot.Scrabble.startGame)]
+//    let players    = [("nbryn", nbryn.Scrabble.startGame); ("OxyphenButazone", Oxyphenbutazone.Scrabble.startGame)]
 //    let players = spawnMultiples "nbryn" nbryn.Scrabble.startGame 2
 //    let players    = [("nbryn", nbryn.Scrabble.startGame)]
     let (dictionary, time) =
