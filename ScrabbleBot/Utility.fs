@@ -1,12 +1,22 @@
 namespace nbryn
 
 open ScrabbleUtil
+open Types
 module internal Utility =
+    
+    let rec stepDict (word : 'a list) dict = 
+            if word.Length = 0 then (true, true, dict) else
+            if word.Length = 1 
+            then match Dictionary.step (fst (snd word.[0])) dict with
+                 | Some (true, d)  -> (true, true, d)
+                 | Some (false, d) -> (true, false, d)
+                 | None            -> (false, false,  dict)
+            else
+            match Dictionary.step (fst (snd word.[0])) dict with
+            | Some (_, d)  -> stepDict (word.[1..word.Length-1]) d
+            | None         -> (false, false, dict)
 
-    (* let memoize (f: 'a -> 'b) =
-        let cache = System.Collections.Concurrent.ConcurrentDictionary<'a, 'b>()
-        fun x -> cache.GetOrAdd(x, f) *)
-
+    
     let memoize fn =
       let cache = new System.Collections.Generic.Dictionary<_,_>()
       (fun s c ->
@@ -29,19 +39,31 @@ module internal Utility =
     let appender word append = word@append
     let prepender word prepend = prepend@word
 
-    let foldHelper f1 f2 firstAdjuster secondAdjuster state char =
+    let foldHelper f1 f2 fAdjuster sAdjuster state char =
         Map.fold (fun acc key value ->
-        Map.add key value acc) (f1 state (firstAdjuster (fst char)) ([char], 0)) (f2 state (secondAdjuster (fst char)) ([char], 0))
+        Map.add key value acc) (f1 state (fAdjuster (fst char)) ([char], 0)) (f2 state (sAdjuster (fst char)) (snd (Dictionary.step (fst (snd char)) state.dict).Value))
 
-    let foldHelper2 f1 f2 collector1 collector2 state coord =
+    let foldHelper2 f1 f2 collector collector2 (state : State) coord =
+        let (_,_,newD) = stepDict (fst (collector2 state [] coord)) state.dict
         Map.fold (fun acc key value ->
-        Map.add key value acc) (f1 state coord (collector1 state [] coord)) (f2 state coord (collector2 state [] coord))
+        Map.add key value acc) (f1 state coord (collector state [] coord)) (f2 state coord newD)
 
     let foldHelper3 map1 map2  =
         Map.fold (fun acc key value -> Map.add key value acc) map1 map2
+
+    let apply stF stF2 collector1 collector2 firstF secondF fAdjuster sAdjuster collector3 (state : State) char xt  =
+        let existing : List<coord * (char * int)> * int = collector3 state [char] (fst char)
+        let (_,_,newD) = stepDict (fst existing) state.dict
+        foldHelper2 stF stF2 collector1 collector2 state (fAdjuster (fst char))
+        |> fun fm -> firstF state (if xt then fAdjuster (fst char) else sAdjuster (fst existing).Length (fst char)) existing |> foldHelper3 fm
+        |> fun sm -> Some (foldHelper3 sm (secondF state (if xt then sAdjuster (fst existing).Length (fst char) else fAdjuster (fst char)) newD))
+
+    let apply2 stF stF2 collector1 collector2 firstF secondF fAdjuster sAdjuster state char =
+        foldHelper2 stF stF2 collector1 collector2 state (fAdjuster (fst char))
+        |> foldHelper3 (foldHelper2 stF stF2 collector1 collector2 state (sAdjuster (fst char)))
+        |> fun thirdM -> Some (foldHelper3 thirdM (foldHelper firstF secondF fAdjuster sAdjuster state char))
 module internal BoardUtil =
     open Utility
-    open Types
 
     let incrementXTimes amount coord  : coord = (fst coord + amount, snd coord)
     let decrementXTimes amount coord  : coord = (fst coord - amount, snd coord)
@@ -90,14 +112,17 @@ module internal BoardUtil =
         let word = List.map (fun (_,(_,(y, _))) -> y) list |> List.toArray |> System.String
         Dictionary.lookup word st.dict
 
-    let calcPoints (st : State) (word : List<coord*(char*int)>) =
-        List.filter (fun x -> squareFree st (fst x)) word
-         |> List.map (fun x -> st.board.squares (fst x) |> fun t -> t.Value) 
-         |> List.mapi (fun i square -> Map.toList square |> fun x -> List.map (fun (priority, stm) -> (priority, stm (List.map (fun x -> snd x) word) i)) x)
-         |> List.fold (fun list n -> List.append n list) []
-         |> List.sortBy (fst)
-         |> List.map (snd)
-         |> List.fold (( >> )) (id)
-         |> fun x -> x 0
-         |> fun t -> List.fold (fun acc ele -> acc + (snd (snd ele))) t (List.filter (fun x -> not (squareFree st (fst x))) word)
-         |> fun m -> if (List.filter (fun x -> squareFree st (fst x)) word).Length = 7 then m + 50 else m
+    let simpleCalcPoint (word : List<coord * (char * int)>) = List.fold (fun acc ele -> (snd (snd ele)) + acc) 0 word    
+
+    let calcPoints (st : State) (word : List<coord*(uint32*(char*int))>) =
+        word |> List.map (fun x -> st.board.squares (fst x) |> fun t -> t.Value) 
+             |> List.mapi (fun i square -> Map.toList square |> fun x -> List.map (fun (priority, stm) -> (priority, stm (List.map (fun x -> snd (snd x)) word) i)) x)
+             |> List.fold (fun list n -> List.append n list) []
+             |> List.sortBy (fst)
+             |> List.map (snd)
+             |> List.fold (( >> )) (id)
+             |> fun x -> x 0
+             |> fun m -> if word.Length = 7 then m + 50 else m
+
+
+     

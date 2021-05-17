@@ -68,7 +68,7 @@ module Scrabble =
 
                     match move with
                     | SMPlay move   -> send cstream (SMPlay move)
-                    | SMChange move -> send cstream (SMChange move)
+                    | SMPass -> send cstream SMPass
 
             let msg = recv cstream
 
