@@ -39,29 +39,29 @@ module internal Utility =
     let appender word append = word@append
     let prepender word prepend = prepend@word
 
-    let foldHelper f1 f2 fAdjuster sAdjuster state char =
-        Map.fold (fun acc key value ->
-        Map.add key value acc) (f1 state (fAdjuster (fst char)) ([char], 0)) (f2 state (sAdjuster (fst char)) (snd (Dictionary.step (fst (snd char)) state.dict).Value))
+    let foldHelper map1 map2  =
+        Map.fold (fun acc key value -> Map.add key value acc) map1 map2
 
-    let foldHelper2 f1 f2 collector collector2 (state : State) coord =
+    let foldHelper2 f1 f2 fAdjuster sAdjuster state char =
+        Map.fold (fun acc key value ->
+        Map.add key value acc) (f1 state (fAdjuster (fst char)) ([char], 0) state.dict) (f2 state (sAdjuster (fst char)) ([],[]) (snd (Dictionary.step (fst (snd char)) state.dict).Value))
+
+    let foldHelper3 f1 f2 collector collector2 (state : State) coord =
         let (_,_,newD) = stepDict (fst (collector2 state [] coord)) state.dict
         Map.fold (fun acc key value ->
-        Map.add key value acc) (f1 state coord (collector state [] coord)) (f2 state coord newD)
-
-    let foldHelper3 map1 map2  =
-        Map.fold (fun acc key value -> Map.add key value acc) map1 map2
+        Map.add key value acc) (f1 state coord (collector state [] coord) state.dict) (f2 state coord ([],[]) newD)
 
     let apply stF stF2 collector1 collector2 firstF secondF fAdjuster sAdjuster collector3 (state : State) char xt  =
         let existing : List<coord * (char * int)> * int = collector3 state [char] (fst char)
         let (_,_,newD) = stepDict (fst existing) state.dict
-        foldHelper2 stF stF2 collector1 collector2 state (fAdjuster (fst char))
-        |> fun fm -> firstF state (if xt then fAdjuster (fst char) else sAdjuster (fst existing).Length (fst char)) existing |> foldHelper3 fm
-        |> fun sm -> Some (foldHelper3 sm (secondF state (if xt then sAdjuster (fst existing).Length (fst char) else fAdjuster (fst char)) newD))
+        foldHelper3 stF stF2 collector1 collector2 state (fAdjuster (fst char))
+        |> fun fm -> firstF state (if xt then fAdjuster (fst char) else sAdjuster (fst existing).Length (fst char)) existing state.dict |> foldHelper fm
+        |> fun sm -> Some (foldHelper sm (secondF state (if xt then sAdjuster (fst existing).Length (fst char) else fAdjuster (fst char)) ([],[]) newD))
 
     let apply2 stF stF2 collector1 collector2 firstF secondF fAdjuster sAdjuster state char =
-        foldHelper2 stF stF2 collector1 collector2 state (fAdjuster (fst char))
-        |> foldHelper3 (foldHelper2 stF stF2 collector1 collector2 state (sAdjuster (fst char)))
-        |> fun thirdM -> Some (foldHelper3 thirdM (foldHelper firstF secondF fAdjuster sAdjuster state char))
+        foldHelper3 stF stF2 collector1 collector2 state (fAdjuster (fst char))
+        |> foldHelper (foldHelper3 stF stF2 collector1 collector2 state (sAdjuster (fst char)))
+        |> fun thirdM -> Some (foldHelper thirdM (foldHelper2 firstF secondF fAdjuster sAdjuster state char))
 module internal BoardUtil =
     open Utility
 
